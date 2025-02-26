@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-Frame Annotations</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <style>
+        .annotation {
+            position: absolute;
+            z-index: 1;
+            padding: 1em;
+            width: 200px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: .5em;
+            font-size: 12px;
+            line-height: 1.2;
+            transition: opacity .5s;
+        }
+    </style>
+    <script>
+        AFRAME.registerComponent('annotation-component', {
+            init: function () {
+                this.sceneEl = this.el.sceneEl;
+                this.camera = this.sceneEl.camera;
+                this.annotations = document.querySelectorAll('.annotation');
+                this.trackedObjects = {};
+                
+                document.querySelectorAll('[data-annotation]').forEach(obj => {
+                    let annotation = document.createElement('div');
+                    annotation.className = 'annotation';
+                    annotation.innerHTML = obj.getAttribute('data-annotation');
+                    document.body.appendChild(annotation);
+                    this.trackedObjects[obj.id] = { object: obj.object3D, annotation: annotation };
+                });
+            },
+            tick: function () {
+                if (!this.camera) return;
+                
+                for (let key in this.trackedObjects) {
+                    let { object, annotation } = this.trackedObjects[key];
+                    if (!object) continue;
+                    
+                    let worldPos = new THREE.Vector3();
+                    object.getWorldPosition(worldPos);
+                    
+                    if (this.sceneEl.is('vr-mode')) {
+                        worldPos.z += 2;
+                        worldPos.y += 1;
+                        // Move annotation 1 unit further in VR mode
+                    }
+                    
+                    let screenPos = worldPos.project(this.camera);
+                    
+                    let x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                    let y = (1 - (screenPos.y * 0.5 + 0.5)) * window.innerHeight;
+                    
+                    annotation.style.left = `${x}px`;
+                    annotation.style.top = `${y}px`;
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene>
+        <a-entity id="camera" position="0 1.6 4" annotation-component>
+            <a-camera></a-camera>
+        </a-entity>
+       <a-box id="cube" position="0 1 -3" color="#156289" shadow data-annotation="<strong>Cube</strong><br>A cube is a 3D solid with six square faces."></a-box>
+        <a-sphere id="sphere" position="2 1 -4" radius="0.8" color="#D04A02" shadow data-annotation="<strong>Sphere</strong><br>A sphere is a perfectly round 3D shape."></a-sphere>
+        <a-cylinder id="cylinder" position="-2 1 -4" radius="0.5" height="1.5" color="#4CAF50" shadow data-annotation="<strong>Cylinder</strong><br>A cylinder has two parallel circular bases."></a-cylinder>
+        <a-sky color="#ECECEC"></a-sky>
+    </a-scene>
+</body>
+</html>
