@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-Frame Tooltip Component</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="transform-controls.js"></script>
+
+    <script>
+        AFRAME.registerComponent("tooltip-component", {
+            init: function () {
+                const style = document.createElement("style");
+                style.textContent = `
+                    .tooltip {
+                        position: absolute;
+                        z-index: 1;
+                        padding: 1em;
+                        width: 200px;
+                        color: #fff;
+                        background: rgba(0, 0, 0, 0.8);
+                        border-radius: 0.5em;
+                        font-size: 12px;
+                        line-height: 1.2;
+                        transition: opacity 0.5s;
+                    }
+
+                    #create-tooltip-btn {
+                        position: absolute;
+                        top: 20px;
+                        left: 20px;
+                        padding: 10px 20px;
+                        background-color: #007bff;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        z-index: 999;
+                    }
+
+                    .popup {
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: white;
+                        padding: 15px;
+                        border-radius: 8px;
+                        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+                        text-align: center;
+                        z-index: 1000;
+                        display: none;
+                    }
+
+                    .popup input {
+                        margin: 10px 0;
+                        padding: 5px;
+                        width: 80%;
+                    }
+
+                    .popup button {
+                        background-color: #007bff;
+                        color: white;
+                        border: none;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                    }
+                `;
+                document.head.appendChild(style);
+
+
+                document.querySelector("#create-tooltip-btn").addEventListener("click", () => {
+                    this.showPopup();
+                });
+            },
+
+            showPopup: function () {
+                const popup = document.createElement("div");
+                popup.classList.add("popup");
+                popup.innerHTML = `
+            <p>Enter the tooltip text:</p>
+            <input type="text" id="tooltip-input" placeholder="Type here...">
+            <br>
+            <button id="submit-tooltip">OK</button>
+        `;
+                document.body.appendChild(popup);
+                popup.style.display = "block";
+
+                document.getElementById("submit-tooltip").addEventListener("click", () => {
+                    this.submittooltip();
+                });
+            },
+
+            submittooltip: function () {
+                const tooltipText = document.getElementById("tooltip-input").value;
+                document.querySelector(".popup").remove();
+                if (tooltipText) {
+                    this.createNewtooltip(tooltipText);
+                }
+            },
+
+            createNewtooltip: function (tooltipText) {
+                if (!tooltipText) return;
+
+                const scene = document.querySelector("a-scene");
+
+                // Create the new plane
+                const newPlane = document.createElement("a-plane");
+                newPlane.setAttribute("id", "new-plane");
+                newPlane.setAttribute("position", "0 0 -3");
+                newPlane.setAttribute("width", "4");
+                newPlane.setAttribute("height", "2");
+                newPlane.setAttribute("color", "#D04A02");
+                newPlane.setAttribute("shadow", "");
+                scene.appendChild(newPlane);
+
+                // Listen for object position updates
+                document.addEventListener("objectPositionUpdate", (event) => {
+                    console.log("Received position:", event.detail);
+                    const plane = document.getElementById("new-plane");
+                    if (!plane) return;
+                    const text = plane.querySelector("a-text");
+                    if (!text) return;
+                    const { x, y, z } = event.detail;
+                    text.setAttribute("position", `${x} ${y} ${z}`);
+                });
+
+                // Create and position the text
+                const newText = document.createElement("a-text");
+                newText.setAttribute("position", "0 0 0");
+                newText.setAttribute("rotation", "0 0 0");
+                newText.setAttribute("width", "8");
+                newText.setAttribute("color", "#00FF00");
+                newText.setAttribute(
+                    "text",
+                    `value: ${tooltipText}; color: white; align: center;`
+                );
+                newPlane.appendChild(newText);
+
+                // Interaction handling
+                const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+                const STARTEVENT = isTouch ? "touchstart" : "mousedown";
+                const ENDEVENT = isTouch ? "touchend" : "mouseup";
+
+                window.setTimeout(() => {
+                    new Editor();
+                }, 100);
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <button id="create-tooltip-btn">
+        Create tooltip
+    </button>
+    <a-scene tooltip-component>
+        <a-entity id="camera" position="0 1.6 4">
+            <a-camera></a-camera>
+        </a-entity>
+
+        <a-sky color="#ECECEC"></a-sky>
+    </a-scene>
+</body>
+
+</html>
