@@ -6,11 +6,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tooltip and Camera Recording</title>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="post-processing.js"></script>
     <script src="transform-controls.js"></script>
     <script src="gaussian-splat-viewer.js"></script>
     <script src="https://unpkg.com/aframe-troika-text/dist/aframe-troika-text.min.js"></script>
 
     <style>
+        .input-row {
+            display: flex;
+            gap: 10px;
+            /* Space between inputs */
+            margin-bottom: 10px;
+            /* Space between rows */
+        }
+
+        .input-row input,
+        #positionX,
+        #positionY,
+        #positionZ,
+        #rotationX,
+        #rotationY,
+        #rotationZ {
+            width: 60px;
+            /* Adjust width as needed */
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+
         /* Panels styling */
         .panel {
             position: fixed;
@@ -456,6 +481,7 @@
 
 
         // Function to toggle panels
+
         function togglePanel(panelId) {
             const translate = document.getElementById('translateIcon');
             const rotate = document.getElementById('rotateIcon');
@@ -711,7 +737,54 @@
             // Get reference to the file input
             let fileInput = document.getElementById('gltf-loader');
 
-            // Listen for file input changes
+
+            // Get references to the position and rotation inputs
+            const positionX = document.getElementById('positionX');
+            const positionY = document.getElementById('positionY');
+            const positionZ = document.getElementById('positionZ');
+
+            const rotationX = document.getElementById('rotationX');
+            const rotationY = document.getElementById('rotationY');
+            const rotationZ = document.getElementById('rotationZ');
+
+            // Function to update position
+            function updatePosition() {
+                const x = parseFloat(positionX.value) || 0;
+                const y = parseFloat(positionY.value) || 0;
+                const z = parseFloat(positionZ.value) || 0;
+
+                // Update the position of the last added entity
+                const entities = modelContainer.querySelectorAll('a-entity');
+                if (entities.length > 0) {
+                    const lastEntity = entities[entities.length - 1];
+                    lastEntity.setAttribute('position', { x, y, z });
+                }
+            }
+
+            // Function to update rotation
+            function updateRotation() {
+                const x = parseFloat(rotationX.value) || 0;
+                const y = parseFloat(rotationY.value) || 0;
+                const z = parseFloat(rotationZ.value) || 0;
+
+                // Update the rotation of the last added entity
+                const entities = modelContainer.querySelectorAll('a-entity');
+                if (entities.length > 0) {
+                    const lastEntity = entities[entities.length - 1];
+                    lastEntity.setAttribute('rotation', { x, y, z });
+                }
+            }
+
+            // Add event listeners to position inputs
+            positionX.addEventListener('input', updatePosition);
+            positionY.addEventListener('input', updatePosition);
+            positionZ.addEventListener('input', updatePosition);
+
+            // Add event listeners to rotation inputs
+            rotationX.addEventListener('input', updateRotation);
+            rotationY.addEventListener('input', updateRotation);
+            rotationZ.addEventListener('input', updateRotation);
+            // Existing file input event listener
             fileInput.addEventListener('change', function (event) {
                 const files = event.target.files;
 
@@ -724,8 +797,16 @@
                             // Create a new Gaussian Splatting entity
                             const splatEntity = document.createElement('a-entity');
                             splatEntity.setAttribute('gaussian-splatting', `src: ${url}`);
-                            splatEntity.setAttribute('position', "0 3 5");
-
+                            splatEntity.setAttribute('position', {
+                                x: parseFloat(positionX.value) || 0,
+                                y: parseFloat(positionY.value) || 0,
+                                z: parseFloat(positionZ.value) || 0
+                            });
+                            splatEntity.setAttribute('rotation', {
+                                x: parseFloat(rotationX.value) || 0,
+                                y: parseFloat(rotationY.value) || 0,
+                                z: parseFloat(rotationZ.value) || 0
+                            });
 
                             // Add the splat entity to the scene
                             modelContainer.appendChild(splatEntity);
@@ -736,9 +817,17 @@
                             // Create a new GLTF model entity
                             const model = document.createElement('a-entity');
                             model.setAttribute('gltf-model', `url(${url})`);
-                            model.setAttribute('position', '0 0 0');
+                            model.setAttribute('position', {
+                                x: parseFloat(positionX.value) || 0,
+                                y: parseFloat(positionY.value) || 0,
+                                z: parseFloat(positionZ.value) || 0
+                            });
+                            model.setAttribute('rotation', {
+                                x: parseFloat(rotationX.value) || 0,
+                                y: parseFloat(rotationY.value) || 0,
+                                z: parseFloat(rotationZ.value) || 0
+                            });
                             model.setAttribute('scale', '1 1 1');
-                            model.setAttribute('rotation', '0 0 0');
 
                             // Add the model to the scene
                             modelContainer.appendChild(model);
@@ -770,6 +859,12 @@
                 if (entity) {
                     entity.setAttribute("wasd-controls", "fly", true); // Enable fly mode
                 }
+            });
+
+            document.getElementById('effect-select').addEventListener('change', function () {
+                const selectedEffect = this.value;
+                const scene = document.querySelector("a-scene");
+                scene.setAttribute("post-processing", "effect", selectedEffect);
             });
         });
     </script>
@@ -841,7 +936,7 @@
 
     <!-- Buttons container -->
     <div id="buttons-container">
-        <button onclick="togglePanel('3d-panel')">3D Uploader</button>
+        <button onclick="togglePanel('3d-panel')">3D Creator</button>
         <button onclick="togglePanel('tooltip-panel')">Tooltip Creator</button>
         <button onclick="togglePanel('camera-panel')">Camera Recorder</button>
         <button onclick="togglePanel('scroll-panel')">Scrollytelling</button>
@@ -857,6 +952,21 @@
         <label>Upload .splat, .gltf or .glb files</label>
         <input type="file" id="gltf-loader" accept=".gltf,.glb,.splat" multiple>
 
+        <!-- Position Input -->
+        <label>Position:</label>
+        <div class="input-row">
+            <input type="number" id="positionX" placeholder="X" value="0" step="0.1">
+            <input type="number" id="positionY" placeholder="Y" value="0" step="0.1">
+            <input type="number" id="positionZ" placeholder="Z" value="0" step="0.1">
+        </div>
+
+        <!-- Rotation Input -->
+        <label>Rotation:</label>
+        <div class="input-row">
+            <input type="number" id="rotationX" placeholder="X" value="0" step="10">
+            <input type="number" id="rotationY" placeholder="Y" value="0" step="10">
+            <input type="number" id="rotationZ" placeholder="Z" value="0" step="10">
+        </div>
     </div>
 
     <div id="tooltip-panel" class="panel">
@@ -895,6 +1005,23 @@
         <label for="speed-slider">Camera Speed:</label>
         <span id="camera-speed-value">10</span>
         <input type="range" id="camera-speed" min="1" max="100" value="10">
+
+        <label for="effect-select">Choose post-processing effect:</label>
+        <select id="effect-select">
+            <option value="none">None</option>
+            <option value="sketchy-pencil">Sketchy Pencil</option>
+            <option value="halftone">Halftone</option>
+            <option value="old-film">Old Film</option>
+            <option value="pixel">Pixel</option>
+            <option value="glitch">Glitch</option>
+            <option value="sobel">Sobel</option>
+            <option value="bloom">Bloom</option>
+            <option value="dot-screen">Dot Screen</option>
+            <option value="volumetric-light">Volumetric Light</option>
+            <option value="afterimage">Afterimage</option>
+            <option value="bad-tv">Bad TV</option>
+        </select>
+
         <button id="startButton">Start Recording</button>
         <button id="endButton">End Recording</button>
         <button id="downloadButton">Download Camera Data</button>
@@ -915,14 +1042,14 @@
 
     </div>
 
-      <!-- Scroll panel -->
-      <div id="export-panel" class="panel">
+    <!-- Scroll panel -->
+    <div id="export-panel" class="panel">
         <h2>Export</h2>
-        
+
     </div>
 
     <!-- A-Frame scene -->
-    <a-scene xr-mode-ui="enabled: false">
+    <a-scene xr-mode-ui="enabled: false" post-processing="effect: none">
         <a-entity camera-movement-recorder camera-movement-animator scroll-animator wasd-controls="acceleration:10"
             look-controls tooltip-component camera position="5.132 1.6 7.237"></a-entity>
         <a-grid position="0 -0.1 0"></a-grid>

@@ -250,8 +250,19 @@ class Editor {
   }
 
   createCamera() {
+    // Get all existing cameras with the class "myCam"
+    const existingCameras = document.querySelectorAll('.myCam');
+  
+    // If there are already 2 cameras, remove the first one
+    if (existingCameras.length >= 2) {
+      const firstCamera = existingCameras[0];
+      firstCamera.parentNode.removeChild(firstCamera); // Remove the first camera
+      //console.log("Removed the oldest camera to maintain a limit of 2 cameras.");
+    }
+  
+    // Create the new camera entity
     this.cameraEl = document.createElement("a-entity");
-    this.cameraEl.id = "myCam";
+    this.cameraEl.classList.add("myCam"); // Add the class "myCam"
     this.cameraEl.setAttribute("camera", {
       far: 1000,
       fov: 75,
@@ -261,7 +272,7 @@ class Editor {
     this.cameraEl.addEventListener("loaded", () => {
       this.camera = this.cameraEl.getObject3D("camera");
       this.initCamera();
-
+  
       this.viewport = new Viewport(this);
     });
     this.sceneEl.appendChild(this.cameraEl);
