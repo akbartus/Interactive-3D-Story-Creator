@@ -77,7 +77,12 @@ class Editor {
     this.addTooltipEventListeners();
 
     this.addTransformIconListeners();
-    
+
+    // Add event listeners for alignment icons
+    this.addAlignmentIconListeners();
+
+    // Add event listeners for color picker
+    this.addColorPickerListener();
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Delete') {
@@ -118,6 +123,46 @@ class Editor {
     });
   }
 
+  addAlignmentIconListeners() {
+    // Add event listeners to alignment icons
+    document.querySelectorAll('.align-icon').forEach(icon => {
+      icon.addEventListener('click', () => {
+        // Remove active class from all icons
+        document.querySelectorAll('.align-icon').forEach(i => i.classList.remove('active'));
+
+        // Add active class to the clicked icon
+        icon.classList.add('active');
+
+        // Get the selected alignment value
+        const selectedAlignment = icon.getAttribute('data-value');
+        console.log('Selected Alignment:', selectedAlignment);
+
+        // Update the align-input value
+        document.getElementById('align-input').value = selectedAlignment;
+
+        // Update the selected tooltip
+        this.updateSelectedTooltip();
+      });
+    });
+  }
+
+  addColorPickerListener() {
+    const colorPickerIcon = document.getElementById('color-picker-icon');
+    const colorInput = document.getElementById('color-input');
+
+    if (colorPickerIcon && colorInput) {
+      // Trigger the color picker when the icon is clicked
+      colorPickerIcon.addEventListener('click', () => {
+        colorInput.click();
+      });
+
+      // Update the tooltip color when the color input changes
+      colorInput.addEventListener('input', () => {
+        this.updateSelectedTooltip();
+      });
+    }
+  }
+
   addTooltipEventListeners() {
     const tooltipInputs = [
       'tooltip-input', 'align-input', 'color-input',
@@ -151,7 +196,7 @@ class Editor {
       tooltip.setAttribute('value', tooltipText);
       tooltip.setAttribute('align', align);
       tooltip.setAttribute('color', color); // Ensure color is updated
- 
+
       tooltip.setAttribute('fill-opacity', fillOpacity);
       tooltip.setAttribute('font', font);
       tooltip.setAttribute('font-size', fontSize);
@@ -173,7 +218,7 @@ class Editor {
       document.getElementById("tooltip-input").value = tooltip.getAttribute('value') || '';
       document.getElementById("align-input").value = tooltip.getAttribute('align') || '';
       document.getElementById("color-input").value = tooltip.getAttribute('color') || '#ffffff'; // Default to white if no color is set
-   
+
       document.getElementById("fill-opacity-input").value = tooltip.getAttribute('fill-opacity') || '';
       document.getElementById("font-input").value = tooltip.getAttribute('font') || '';
       document.getElementById("font-size-input").value = tooltip.getAttribute('font-size') || '';
@@ -196,6 +241,7 @@ class Editor {
       });
     }
   }
+
 
   toggleTransformMode() {
     if (this.viewport) {
