@@ -242,6 +242,31 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+
+        .text-overlay {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: bottom 0.5s ease, opacity 0.5s ease;
+            opacity: 0;
+            z-index: 10000;
+        }
+
+        .text-overlay.visible {
+            bottom: 50%;
+            opacity: 1;
+        }
+
+        .text-overlay.hidden {
+            bottom: -100px;
+            opacity: 0;
+        }
     </style>
 
     <script>
@@ -523,183 +548,338 @@
             }
         });
 
-        AFRAME.registerComponent('scroll-animator', {
-    schema: {
-        speed: { type: 'number', default: 10 } // Speed control for animation
-    },
 
-    init: function () {
-        // File input setup
-        const fileInput = document.querySelector("#fileInput2");
-        fileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.animationData = JSON.parse(e.target.result);
-                    this.steps = Object.keys(this.animationData);
-                    this.currentStepIndex = 0;
+
+
+        AFRAME.registerComponent('scroll-animator', {
+            schema: {
+                speed: { type: 'number', default: 10 }
+            },
+
+            init: function () {
+                this.textOverlays = [];
+                this.currentTextIndex = 0;
+                this.textDisplayRange = 10; // Default number of frames for fade-in and fade-out
+
+                // File input setup
+                const fileInput = document.querySelector("#fileInput2");
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.animationData = JSON.parse(e.target.result);
+                            this.steps = Object.keys(this.animationData);
+                            this.currentStepIndex = 0;
+                            this.currentIndex = 0;
+
+                            // Display total frame count and duration from the loaded JSON
+                            const stepKey = this.steps[0]; // Assuming only one step for simplicity
+                            const frameCount = this.animationData[stepKey].frameCount;
+                            const duration = this.animationData[stepKey].duration;
+
+                            // Update the HTML elements
+                            document.querySelector('#frameCount2').textContent = frameCount;
+                            document.querySelector('#duration2').textContent = duration.toFixed(2);
+
+                            // Update the "This Frame" slider
+                            const frameSlider = document.getElementById('frame-slider');
+                            const frameSliderValue = document.getElementById('frame-slider-value');
+                            if (frameSlider && frameSliderValue) {
+                                frameSlider.max = frameCount - 1; // Set max to total frames - 1
+                                frameSlider.value = 0;
+                                frameSliderValue.textContent = 0;
+                            }
+
+                            this.setupScrollListener();
+                        };
+                        reader.readAsText(file);
+                    }
+                });
+
+                // Slider setup
+                const speedSlider = document.getElementById('speed-slider');
+                const speedValue = document.querySelector('.speed-value');
+
+                if (speedSlider && speedValue) {
+                    // Initialize the displayed speed value
+                    speedValue.textContent = this.data.speed;
+
+                    // Update speed value display and set the speed in the scroll-animator component
+                    speedSlider.addEventListener('input', (event) => {
+                        const speed = parseInt(event.target.value, 10);
+                        speedValue.textContent = speed;
+
+                        // Update the speed in the scroll-animator component
+                        this.el.setAttribute('scroll-animator', 'speed', speed);
+                    });
+                }
+
+                // Add event listener for the "Add Text" button
+                document.getElementById('add-text-button').addEventListener('click', () => {
+                    this.addTextInput();
+                });
+
+                // Add event listener for the "This Frame" slider
+                const frameSlider = document.getElementById('frame-slider');
+                const frameSliderValue = document.getElementById('frame-slider-value');
+
+                if (frameSlider && frameSliderValue) {
+                    frameSlider.addEventListener('input', (event) => {
+                        const frame = parseInt(event.target.value, 10);
+                        frameSliderValue.textContent = frame;
+                        this.jumpToFrame(frame);
+                    });
+                }
+            },
+
+            addTextInput: function () {
+                const container = document.querySelector('.text-inputs-container');
+                const newTextInput = document.createElement('div');
+                newTextInput.className = 'text-input-row';
+                newTextInput.innerHTML = `
+            <input type="text" class="scrollableText" placeholder="Enter text...">
+            <input type="number" class="frameNumber" placeholder="Frame number">
+            <input type="number" class="durationFrames" placeholder="Duration in frames" min="1" value="10">
+        `;
+                container.appendChild(newTextInput);
+            },
+
+            setupScrollListener: function () {
+                if (!this.animationData || this.steps.length === 0) return;
+                this.el.removeAttribute('look-controls'); // Disable look-controls during animation
+
+                window.addEventListener('wheel', (event) => {
+                    if (event.deltaY > 0) {
+                        this.nextFrame();
+                    } else {
+                        this.previousFrame();
+                    }
+                });
+            },
+
+            nextFrame: function () {
+                // Check if animation data is loaded and steps exist
+                if (!this.animationData || this.steps.length === 0) return;
+
+                // Stop if already at the end of the animation
+                if (this.currentStepIndex >= this.steps.length - 1 && this.currentIndex >= this.animationData[this.steps[this.currentStepIndex]].position.length - 1) {
+                    console.log("Reached the end of the animation.");
+                    return;
+                }
+
+                let stepKey = this.steps[this.currentStepIndex];
+                let stepData = this.animationData[stepKey];
+
+                // Boundary check for stepData
+                if (!stepData || !stepData.position) {
+                    console.error("Invalid step data or missing position array.");
+                    return;
+                }
+
+                // Advance by the speed value
+                this.currentIndex += this.data.speed;
+
+                // Boundary check for currentIndex
+                if (this.currentIndex >= stepData.position.length) {
+                    this.currentStepIndex++;
                     this.currentIndex = 0;
 
-                    // Display total frame count and duration from the loaded JSON
-                    const stepKey = this.steps[0]; // Assuming only one step for simplicity
-                    const frameCount = this.animationData[stepKey].frameCount;
-                    const duration = this.animationData[stepKey].duration;
+                    // Stop if we've reached the end of all steps
+                    if (this.currentStepIndex >= this.steps.length) {
+                        this.currentStepIndex = this.steps.length - 1;
+                        this.currentIndex = stepData.position.length - 1; // Stay at the last frame
+                        console.log("Reached the end of the animation.");
+                        return;
+                    }
 
-                    // Update the HTML elements
-                    document.querySelector('#frameCount2').textContent = frameCount;
-                    document.querySelector('#duration2').textContent = duration.toFixed(2);
+                    // Move to the next step
+                    stepKey = this.steps[this.currentStepIndex];
+                    stepData = this.animationData[stepKey];
+                }
 
-                    this.setupScrollListener();
-                };
-                reader.readAsText(file);
+                this.updateCameraPosition(stepData);
+                this.updateTextOverlay();
+            },
+
+            previousFrame: function () {
+                // Check if animation data is loaded and steps exist
+                if (!this.animationData || this.steps.length === 0) return;
+
+                // Stop if already at the beginning of the animation
+                if (this.currentStepIndex <= 0 && this.currentIndex <= 0) {
+                    console.log("Reached the beginning of the animation.");
+                    return;
+                }
+
+                let stepKey = this.steps[this.currentStepIndex];
+                let stepData = this.animationData[stepKey];
+
+                // Boundary check for stepData
+                if (!stepData || !stepData.position) {
+                    console.error("Invalid step data or missing position array.");
+                    return;
+                }
+
+                // Go back by the speed value
+                this.currentIndex -= this.data.speed;
+
+                // Boundary check for currentIndex
+                if (this.currentIndex < 0) {
+                    this.currentStepIndex--;
+                    this.currentIndex = 0;
+
+                    // Stop if we've reached the beginning of all steps
+                    if (this.currentStepIndex < 0) {
+                        this.currentStepIndex = 0;
+                        this.currentIndex = 0; // Stay at the first frame
+                        console.log("Reached the beginning of the animation.");
+                        return;
+                    }
+
+                    // Move to the previous step
+                    stepKey = this.steps[this.currentStepIndex];
+                    stepData = this.animationData[stepKey];
+                    this.currentIndex = stepData.position.length - 1;
+                }
+
+                this.updateCameraPosition(stepData);
+                this.updateTextOverlay();
+            },
+
+            jumpToFrame: function (frame) {
+                if (!this.animationData || this.steps.length === 0) return;
+
+                // Calculate the step and index for the given frame
+                let stepKey = this.steps[this.currentStepIndex];
+                let stepData = this.animationData[stepKey];
+
+                if (frame >= 0 && frame < stepData.position.length) {
+                    this.currentIndex = frame;
+                    this.updateCameraPosition(stepData);
+                    this.updateTextOverlay();
+                }
+            },
+
+            updateCameraPosition: function (stepData) {
+                let pos = stepData.position[this.currentIndex];
+                let rot = stepData.rotation[this.currentIndex];
+
+                this.el.setAttribute('position', `${pos[0]} ${pos[1]} ${pos[2]}`);
+
+                let quaternion = new THREE.Quaternion();
+                quaternion.setFromEuler(new THREE.Euler(
+                    THREE.MathUtils.degToRad(rot[0]),
+                    THREE.MathUtils.degToRad(rot[1]),
+                    THREE.MathUtils.degToRad(rot[2]),
+                    'YXZ'
+                ));
+                this.el.object3D.quaternion.slerp(quaternion, 0.1);
+
+                // Update current frame
+                const currentFrame = this.currentIndex + 1; // Frames are 1-indexed
+                document.querySelector('#currentFrame2').textContent = currentFrame;
+
+                // Update the "This Frame" slider
+                const frameSlider = document.getElementById('frame-slider');
+                const frameSliderValue = document.getElementById('frame-slider-value');
+                if (frameSlider && frameSliderValue) {
+                    frameSlider.value = this.currentIndex;
+                    frameSliderValue.textContent = this.currentIndex;
+                }
+            },
+
+            updateTextOverlay: function () {
+                const currentFrame = this.currentIndex + 1;
+                const textInputs = document.querySelectorAll('.text-input-row');
+                let foundText = false;
+
+                textInputs.forEach((inputRow, index) => {
+                    const frameNumberInput = inputRow.querySelector('.frameNumber');
+                    const textInput = inputRow.querySelector('.scrollableText');
+                    const durationInput = inputRow.querySelector('.durationFrames');
+                    const frameNumber = parseInt(frameNumberInput.value, 10);
+                    const durationFrames = parseInt(durationInput.value, 10);
+
+                    // Calculate the range of frames where the text should be visible
+                    const startFrame = frameNumber - this.textDisplayRange;
+                    const endFrame = frameNumber + durationFrames + this.textDisplayRange;
+
+                    if (currentFrame >= startFrame && currentFrame <= endFrame) {
+                        const progress = this.calculateProgress(currentFrame, frameNumber, durationFrames);
+                        this.showTextOverlay(textInput.value, progress);
+                        foundText = true;
+                    }
+                });
+
+                if (!foundText) {
+                    this.hideTextOverlay();
+                }
+            },
+
+            calculateProgress: function (currentFrame, targetFrame, durationFrames) {
+                const fadeInEnd = targetFrame;
+                const fadeOutStart = targetFrame + durationFrames;
+                const fadeOutEnd = fadeOutStart + this.textDisplayRange;
+
+                if (currentFrame < targetFrame) {
+                    // Fade in phase: move from bottom to center
+                    return (currentFrame - (targetFrame - this.textDisplayRange)) / this.textDisplayRange;
+                } else if (currentFrame >= targetFrame && currentFrame < fadeOutStart) {
+                    // Stay in center phase
+                    return 1;
+                } else if (currentFrame >= fadeOutStart && currentFrame <= fadeOutEnd) {
+                    // Fade out phase: move from center to top
+                    return 1 - (currentFrame - fadeOutStart) / this.textDisplayRange;
+                } else {
+                    // Outside the visible range
+                    return 0;
+                }
+            },
+
+            showTextOverlay: function (text, progress) {
+                let textOverlay = document.querySelector('.text-overlay');
+                if (!textOverlay) {
+                    textOverlay = document.createElement('div');
+                    textOverlay.className = 'text-overlay';
+                    document.body.appendChild(textOverlay);
+                }
+                textOverlay.textContent = text;
+
+                // Calculate opacity and position based on progress
+                let opacity, bottom;
+
+                if (progress < 0.5) {
+                    // Phase 1: Move from bottom to center and fade in
+                    opacity = progress * 2; // Fade in from 0 to 1
+                    bottom = 100 - (progress * 100); // Move from bottom (100%) to center (50%)
+                } else if (progress >= 0.5 && progress <= 1) {
+                    // Phase 2: Stay in the center with full opacity
+                    opacity = 1; // Fully visible
+                    bottom = 50; // Stay in the center
+                } else if (progress > 1 && progress <= 1.5) {
+                    // Phase 3: Move from center to top and fade out
+                    opacity = 1 - ((progress - 1) * 2); // Fade out from 1 to 0
+                    bottom = 50 - ((progress - 1) * 100); // Move from center (50%) to top (0%)
+                } else {
+                    // Phase 4: Completely hidden
+                    opacity = 0;
+                    bottom = 0;
+                }
+
+                textOverlay.style.opacity = opacity;
+                textOverlay.style.bottom = `${bottom}%`;
+            },
+
+            hideTextOverlay: function () {
+                const textOverlay = document.querySelector('.text-overlay');
+                if (textOverlay) {
+                    textOverlay.style.opacity = 0;
+                    textOverlay.style.bottom = '100%'; // Move the text overlay back to the bottom when hiding
+                }
             }
         });
 
-        // Slider setup
-        const speedSlider = document.getElementById('speed-slider');
-        const speedValue = document.querySelector('.speed-value');
-
-        if (speedSlider && speedValue) {
-            // Initialize the displayed speed value
-            speedValue.textContent = this.data.speed;
-
-            // Update speed value display and set the speed in the scroll-animator component
-            speedSlider.addEventListener('input', (event) => {
-                const speed = parseInt(event.target.value, 10);
-                speedValue.textContent = speed;
-
-                // Update the speed in the scroll-animator component
-                this.el.setAttribute('scroll-animator', 'speed', speed);
-            });
-        }
-    },
-
-    setupScrollListener: function () {
-        if (!this.animationData || this.steps.length === 0) return;
-        this.el.removeAttribute('look-controls'); // Disable look-controls during animation
-
-        window.addEventListener('wheel', (event) => {
-            if (event.deltaY > 0) {
-                this.nextFrame();
-            } else {
-                this.previousFrame();
-            }
-        });
-    },
-
-    nextFrame: function () {
-        // Check if animation data is loaded and steps exist
-        if (!this.animationData || this.steps.length === 0) return;
-
-        // Stop if already at the end of the animation
-        if (this.currentStepIndex >= this.steps.length - 1 && this.currentIndex >= this.animationData[this.steps[this.currentStepIndex]].position.length - 1) {
-            console.log("Reached the end of the animation.");
-            return;
-        }
-
-        let stepKey = this.steps[this.currentStepIndex];
-        let stepData = this.animationData[stepKey];
-
-        // Boundary check for stepData
-        if (!stepData || !stepData.position) {
-            console.error("Invalid step data or missing position array.");
-            return;
-        }
-
-        // Advance by the speed value
-        this.currentIndex += this.data.speed;
-
-        // Boundary check for currentIndex
-        if (this.currentIndex >= stepData.position.length) {
-            this.currentStepIndex++;
-            this.currentIndex = 0;
-
-            // Stop if we've reached the end of all steps
-            if (this.currentStepIndex >= this.steps.length) {
-                this.currentStepIndex = this.steps.length - 1;
-                this.currentIndex = stepData.position.length - 1; // Stay at the last frame
-                console.log("Reached the end of the animation.");
-                return;
-            }
-
-            // Move to the next step
-            stepKey = this.steps[this.currentStepIndex];
-            stepData = this.animationData[stepKey];
-        }
-
-        this.updateCameraPosition(stepData);
-    },
-
-    previousFrame: function () {
-        // Check if animation data is loaded and steps exist
-        if (!this.animationData || this.steps.length === 0) return;
-
-        // Stop if already at the beginning of the animation
-        if (this.currentStepIndex <= 0 && this.currentIndex <= 0) {
-            console.log("Reached the beginning of the animation.");
-            return;
-        }
-
-        let stepKey = this.steps[this.currentStepIndex];
-        let stepData = this.animationData[stepKey];
-
-        // Boundary check for stepData
-        if (!stepData || !stepData.position) {
-            console.error("Invalid step data or missing position array.");
-            return;
-        }
-
-        // Go back by the speed value
-        this.currentIndex -= this.data.speed;
-
-        // Boundary check for currentIndex
-        if (this.currentIndex < 0) {
-            this.currentStepIndex--;
-            this.currentIndex = 0;
-
-            // Stop if we've reached the beginning of all steps
-            if (this.currentStepIndex < 0) {
-                this.currentStepIndex = 0;
-                this.currentIndex = 0; // Stay at the first frame
-                console.log("Reached the beginning of the animation.");
-                return;
-            }
-
-            // Move to the previous step
-            stepKey = this.steps[this.currentStepIndex];
-            stepData = this.animationData[stepKey];
-            this.currentIndex = stepData.position.length - 1;
-        }
-
-        this.updateCameraPosition(stepData);
-    },
-
-    updateCameraPosition: function (stepData) {
-        let pos = stepData.position[this.currentIndex];
-        let rot = stepData.rotation[this.currentIndex];
-
-        this.el.setAttribute('position', `${pos[0]} ${pos[1]} ${pos[2]}`);
-
-        let quaternion = new THREE.Quaternion();
-        quaternion.setFromEuler(new THREE.Euler(
-            THREE.MathUtils.degToRad(rot[0]),
-            THREE.MathUtils.degToRad(rot[1]),
-            THREE.MathUtils.degToRad(rot[2]),
-            'YXZ'
-        ));
-        this.el.object3D.quaternion.slerp(quaternion, 0.1);
-
-        // Update current frame
-        const currentFrame = this.currentIndex + 1; // Frames are 1-indexed
-        document.querySelector('#currentFrame2').textContent = currentFrame;
-    }
-});
-
-
-
-
-        // Function to toggle panels
 
         function togglePanel(panelId) {
             const translate = document.getElementById('translateIcon');
@@ -1128,17 +1308,30 @@
         <label for="speed-slider">Animation Speed:</label>
         <span class="speed-value">10</span>
         <input type="range" id="speed-slider" min="1" max="50" value="10">
-    
+
         <!-- Display current frame, total frames, and duration -->
         <div>
             <p>Current Frame: <span id="currentFrame2">0</span></p>
             <p>Total Frames: <span id="frameCount2">0</span></p>
             <p>Duration: <span id="duration2">0.00</span> seconds</p>
         </div>
-    
+
+        <!-- Add "This Frame" slider -->
+        <label for="frame-slider">This Frame:</label>
+        <input type="range" id="frame-slider" min="0" max="0" value="0">
+        <span id="frame-slider-value">0</span>
+
         <label>Textual Content</label>
-        <input class="scrollableText" type="text">
+        <div class="text-inputs-container">
+            <div class="text-input-row">
+                <input type="text" class="scrollableText" placeholder="Enter text...">
+                <input type="number" class="frameNumber" placeholder="Frame number">
+                <input type="number" class="durationFrames" placeholder="Duration in frames" min="1" value="10">
+            </div>
+        </div>
+        <button id="add-text-button">Add Text</button>
     </div>
+
 
     <!-- Scroll panel -->
     <div id="export-panel" class="panel">

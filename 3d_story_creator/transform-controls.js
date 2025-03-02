@@ -1,6 +1,6 @@
 // Switch to Camera Mode and the camera entity from the scene
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'c' || event.key === 'C') {  // Check for 'E' key press
+    if (event.altKey && event.key === 'c') {  // Check for 'E' key press
       // Get the camera entity
       const cameras = document.querySelectorAll('[camera]');
       
@@ -82,9 +82,9 @@ class Editor {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Delete') {
         this.deleteSelectedEntity();
-      } else if (event.key === 'r' || event.key === 'R') { // rotate mode
+      } else if (event.altKey && event.key === 'r') { // rotate mode
         this.toggleTransformMode(); // Toggle between rotate and translate
-      } else if (event.key === 't' || event.key === 'T') { // scale mode
+      } else if (event.altKey && event.key === 't') { // scale mode
         if (this.currentMode === 'scale') {
           // If already in scale mode, toggle back to the previous mode
           this.setTransformMode(this.previousTransformMode);
@@ -254,7 +254,7 @@ class Editor {
     const existingCameras = document.querySelectorAll('.myCam');
   
     // If there are already 2 cameras, remove the first one
-    if (existingCameras.length >= 2) {
+    if (existingCameras.length >= 1) {
       const firstCamera = existingCameras[0];
       firstCamera.parentNode.removeChild(firstCamera); // Remove the first camera
       //console.log("Removed the oldest camera to maintain a limit of 2 cameras.");
@@ -266,7 +266,7 @@ class Editor {
     this.cameraEl.setAttribute("camera", {
       far: 1000,
       fov: 75,
-      near: 0.1,
+      near: 0.01,
       active: true,
     });
     this.cameraEl.addEventListener("loaded", () => {
