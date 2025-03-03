@@ -296,31 +296,37 @@ class Editor {
   }
 
   createCamera() {
-    // Get all existing cameras with the class "myCam"
     const existingCameras = document.querySelectorAll('.myCam');
   
-    // If there are already 2 cameras, remove the first one
     if (existingCameras.length >= 1) {
       const firstCamera = existingCameras[0];
-      firstCamera.parentNode.removeChild(firstCamera); // Remove the first camera
-      //console.log("Removed the oldest camera to maintain a limit of 2 cameras.");
+  
+      // Detach transform controls from the old camera
+      if (this.viewport && this.viewport.transformControls) {
+        this.viewport.transformControls.detach();
+      }
+  
+      firstCamera.parentNode.removeChild(firstCamera);
     }
   
     // Create the new camera entity
     this.cameraEl = document.createElement("a-entity");
-    this.cameraEl.classList.add("myCam"); // Add the class "myCam"
+    this.cameraEl.classList.add("myCam");
     this.cameraEl.setAttribute("camera", {
       far: 1000,
       fov: 75,
       near: 0.01,
       active: true,
     });
+  
     this.cameraEl.addEventListener("loaded", () => {
       this.camera = this.cameraEl.getObject3D("camera");
       this.initCamera();
   
+      // Reinitialize transform controls for the new camera
       this.viewport = new Viewport(this);
     });
+  
     this.sceneEl.appendChild(this.cameraEl);
   }
 
@@ -576,23 +582,36 @@ class Viewport {
     this.transformControls.size = 0.75;
     this.transformControls.addEventListener("objectChange", (evt) => {
       const object = this.transformControls.object;
+  
       if (!object) {
         return;
       }
 
       //console.log(evt, object);
+      console.log(object.rotation)
 
       // Dispatch customEvent position
-      // document.dispatchEvent(
-      //   new CustomEvent("objectPositionUpdate", {
-      //     detail: {
-      //       x: object.position.x,
-      //       y: object.position.y,
-      //       z: object.position.z,
-      //       id: object.id,
-      //     },
-      //   })
-      // );
+      document.dispatchEvent(
+        new CustomEvent("objectPositionUpdate", {
+          detail: {
+            x: object.position.x,
+            y: object.position.y,
+            z: object.position.z,
+    
+          },
+        })
+      );
+
+      document.dispatchEvent(
+        new CustomEvent("objectRotationUpdate", {
+            detail: {
+                x: (object.rotation._x * 180) / Math.PI,
+                y: (object.rotation._y * 180) / Math.PI,
+                z: (object.rotation._z * 180) / Math.PI,
+            },
+        })
+    );
+    
 
       this.selectionBox.setFromObject(object).update();
     });
@@ -1525,7 +1544,7 @@ class TransformControls extends THREE.Object3D {
     this.domElement.removeEventListener("pointermove", this._onPointerHover);
     this.domElement.removeEventListener("pointermove", this._onPointerMove);
     this.domElement.removeEventListener("pointerup", this._onPointerUp);
-
+  
     this.traverse(function (child) {
       if (child.geometry) child.geometry.dispose();
       if (child.material) child.material.dispose();
