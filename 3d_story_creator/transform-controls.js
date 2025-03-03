@@ -1,45 +1,42 @@
 // Switch to Camera Mode and the camera entity from the scene
-  document.addEventListener('keydown', (event) => {
-    if (event.altKey && event.key === 'c') {  // Check for 'E' key press
-      // Get the camera entity
-      const cameras = document.querySelectorAll('[camera]');
-      
-      // Check if the camera entity exists
-      if (cameras) {
-        // Get the current 'active' state of the camera component
-        let isActive = cameras[1].getAttribute('camera').active;
-  
-        // Toggle the 'active' state
-        cameras[1].setAttribute('camera', 'active', isActive ? 'false' : 'true');
-        cameras[0].setAttribute('camera', 'active', isActive ? 'true' : 'false');
-        
-      } 
-      
-    }
-  });
+document.addEventListener("keydown", (event) => {
+  if (event.altKey && event.key === "c") {
+    // Check for 'E' key press
+    // Get the camera entity
+    const cameras = document.querySelectorAll("[camera]");
 
+    // Check if the camera entity exists
+    if (cameras) {
+      // Get the current 'active' state of the camera component
+      let isActive = cameras[1].getAttribute("camera").active;
 
-// Register the custom a-grid primitive
-AFRAME.registerPrimitive('a-grid', {
-  defaultComponents: {
-    geometry: {
-      primitive: 'plane',
-      width: 75,
-      height: 75
-    },
-    rotation: { x: -90, y: 0, z: 0 },
-    material: {
-      src: 'url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)',
-      repeat: '75 75'
+      // Toggle the 'active' state
+      cameras[1].setAttribute("camera", "active", isActive ? "false" : "true");
+      cameras[0].setAttribute("camera", "active", isActive ? "true" : "false");
     }
-  },
-  mappings: {
-    width: 'geometry.width',
-    height: 'geometry.height',
-    src: 'material.src'
   }
 });
 
+// Register the custom a-grid primitive
+AFRAME.registerPrimitive("a-grid", {
+  defaultComponents: {
+    geometry: {
+      primitive: "plane",
+      width: 75,
+      height: 75,
+    },
+    rotation: { x: -90, y: 0, z: 0 },
+    material: {
+      src: "url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)",
+      repeat: "75 75",
+    },
+  },
+  mappings: {
+    width: "geometry.width",
+    height: "geometry.height",
+    src: "material.src",
+  },
+});
 
 /////////////////////////////
 // Transform Controls ///////
@@ -59,7 +56,7 @@ class Editor {
     this.material = new THREE.MeshBasicMaterial({
       color: 0xff0000,
       visible: false,
-      side: THREE.FrontSide
+      side: THREE.FrontSide,
     });
 
     this.initEntities();
@@ -68,10 +65,10 @@ class Editor {
     this.createHelper();
 
     // Initialize currentMode to 'translate'
-    this.currentMode = 'translate';
+    this.currentMode = "translate";
 
     // Track the previous transform mode
-    this.previousTransformMode = 'translate';
+    this.previousTransformMode = "translate";
 
     // Add event listeners for tooltip input fields
     this.addTooltipEventListeners();
@@ -84,61 +81,65 @@ class Editor {
     // Add event listeners for color picker
     this.addColorPickerListener();
 
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Delete') {
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Delete") {
         this.deleteSelectedEntity();
-      } else if (event.altKey && event.key === 'r') { // rotate mode
+      } else if (event.altKey && event.key === "r") {
+        // rotate mode
         this.toggleTransformMode(); // Toggle between rotate and translate
-      } else if (event.altKey && event.key === 't') { // scale mode
-        if (this.currentMode === 'scale') {
+      } else if (event.altKey && event.key === "t") {
+        // scale mode
+        if (this.currentMode === "scale") {
           // If already in scale mode, toggle back to the previous mode
           this.setTransformMode(this.previousTransformMode);
         } else {
           // Store the current mode and switch to scale mode
           this.previousTransformMode = this.currentMode;
-          this.setTransformMode('scale');
+          this.setTransformMode("scale");
         }
       }
     });
 
-    document.getElementById('deleteButton').addEventListener('click', () => {
+    document.getElementById("deleteButton").addEventListener("click", () => {
       this.deleteSelectedEntity();
     });
   }
 
   addTransformIconListeners() {
     // Translate Icon
-    document.getElementById('translateIcon').addEventListener('click', () => {
-      this.setTransformMode('translate');
+    document.getElementById("translateIcon").addEventListener("click", () => {
+      this.setTransformMode("translate");
     });
 
     // Rotate Icon
-    document.getElementById('rotateIcon').addEventListener('click', () => {
-      this.setTransformMode('rotate');
+    document.getElementById("rotateIcon").addEventListener("click", () => {
+      this.setTransformMode("rotate");
     });
 
     // Scale Icon
-    document.getElementById('scaleIcon').addEventListener('click', () => {
-      this.setTransformMode('scale');
+    document.getElementById("scaleIcon").addEventListener("click", () => {
+      this.setTransformMode("scale");
     });
   }
 
   addAlignmentIconListeners() {
     // Add event listeners to alignment icons
-    document.querySelectorAll('.align-icon').forEach(icon => {
-      icon.addEventListener('click', () => {
+    document.querySelectorAll(".align-icon").forEach((icon) => {
+      icon.addEventListener("click", () => {
         // Remove active class from all icons
-        document.querySelectorAll('.align-icon').forEach(i => i.classList.remove('active'));
+        document
+          .querySelectorAll(".align-icon")
+          .forEach((i) => i.classList.remove("active"));
 
         // Add active class to the clicked icon
-        icon.classList.add('active');
+        icon.classList.add("active");
 
         // Get the selected alignment value
-        const selectedAlignment = icon.getAttribute('data-value');
-        console.log('Selected Alignment:', selectedAlignment);
+        const selectedAlignment = icon.getAttribute("data-value");
+        console.log("Selected Alignment:", selectedAlignment);
 
         // Update the align-input value
-        document.getElementById('align-input').value = selectedAlignment;
+        document.getElementById("align-input").value = selectedAlignment;
 
         // Update the selected tooltip
         this.updateSelectedTooltip();
@@ -147,17 +148,17 @@ class Editor {
   }
 
   addColorPickerListener() {
-    const colorPickerIcon = document.getElementById('color-picker-icon');
-    const colorInput = document.getElementById('color-input');
+    const colorPickerIcon = document.getElementById("color-picker-icon");
+    const colorInput = document.getElementById("color-input");
 
     if (colorPickerIcon && colorInput) {
       // Trigger the color picker when the icon is clicked
-      colorPickerIcon.addEventListener('click', () => {
+      colorPickerIcon.addEventListener("click", () => {
         colorInput.click();
       });
 
       // Update the tooltip color when the color input changes
-      colorInput.addEventListener('input', () => {
+      colorInput.addEventListener("input", () => {
         this.updateSelectedTooltip();
       });
     }
@@ -165,15 +166,21 @@ class Editor {
 
   addTooltipEventListeners() {
     const tooltipInputs = [
-      'tooltip-input', 'align-input', 'color-input',
-      'fill-opacity-input', 'font-input', 'font-size-input',
-      'letter-spacing-input', 'line-height-input', 'max-width-input'
+      "tooltip-input",
+      "align-input",
+      "color-input",
+      "fill-opacity-input",
+      "font-input",
+      "font-size-input",
+      "letter-spacing-input",
+      "line-height-input",
+      "max-width-input",
     ];
 
-    tooltipInputs.forEach(inputId => {
+    tooltipInputs.forEach((inputId) => {
       const input = document.getElementById(inputId);
       if (input) {
-        input.addEventListener('input', () => this.updateSelectedTooltip());
+        input.addEventListener("input", () => this.updateSelectedTooltip());
       }
     });
   }
@@ -187,22 +194,24 @@ class Editor {
       const fillOpacity = document.getElementById("fill-opacity-input").value;
       const font = document.getElementById("font-input").value;
       const fontSize = document.getElementById("font-size-input").value;
-      const letterSpacing = document.getElementById("letter-spacing-input").value;
+      const letterSpacing = document.getElementById(
+        "letter-spacing-input"
+      ).value;
       const lineHeight = document.getElementById("line-height-input").value;
       const maxWidth = document.getElementById("max-width-input").value;
 
       // Update the selected tooltip's attributes
       const tooltip = this.selectEntity.el;
-      tooltip.setAttribute('value', tooltipText);
-      tooltip.setAttribute('align', align);
-      tooltip.setAttribute('color', color); // Ensure color is updated
+      tooltip.setAttribute("value", tooltipText);
+      tooltip.setAttribute("align", align);
+      tooltip.setAttribute("color", color); // Ensure color is updated
 
-      tooltip.setAttribute('fill-opacity', fillOpacity);
-      tooltip.setAttribute('font', font);
-      tooltip.setAttribute('font-size', fontSize);
-      tooltip.setAttribute('letter-spacing', letterSpacing);
-      tooltip.setAttribute('line-height', lineHeight);
-      tooltip.setAttribute('max-width', maxWidth);
+      tooltip.setAttribute("fill-opacity", fillOpacity);
+      tooltip.setAttribute("font", font);
+      tooltip.setAttribute("font-size", fontSize);
+      tooltip.setAttribute("letter-spacing", letterSpacing);
+      tooltip.setAttribute("line-height", lineHeight);
+      tooltip.setAttribute("max-width", maxWidth);
     }
   }
 
@@ -215,42 +224,56 @@ class Editor {
     if (this.selectEntity && this.selectEntity.el) {
       const tooltip = this.selectEntity.el;
 
-      document.getElementById("tooltip-input").value = tooltip.getAttribute('value') || '';
-      document.getElementById("align-input").value = tooltip.getAttribute('align') || '';
-      document.getElementById("color-input").value = tooltip.getAttribute('color') || '#ffffff'; // Default to white if no color is set
+      document.getElementById("tooltip-input").value =
+        tooltip.getAttribute("value") || "";
+      document.getElementById("align-input").value =
+        tooltip.getAttribute("align") || "";
+      document.getElementById("color-input").value =
+        tooltip.getAttribute("color") || "#ffffff"; // Default to white if no color is set
 
-      document.getElementById("fill-opacity-input").value = tooltip.getAttribute('fill-opacity') || '';
-      document.getElementById("font-input").value = tooltip.getAttribute('font') || '';
-      document.getElementById("font-size-input").value = tooltip.getAttribute('font-size') || '';
-      document.getElementById("letter-spacing-input").value = tooltip.getAttribute('letter-spacing') || '';
-      document.getElementById("line-height-input").value = tooltip.getAttribute('line-height') || '';
-      document.getElementById("max-width-input").value = tooltip.getAttribute('max-width') || '';
+      document.getElementById("fill-opacity-input").value =
+        tooltip.getAttribute("fill-opacity") || "";
+      document.getElementById("font-input").value =
+        tooltip.getAttribute("font") || "";
+      document.getElementById("font-size-input").value =
+        tooltip.getAttribute("font-size") || "";
+      document.getElementById("letter-spacing-input").value =
+        tooltip.getAttribute("letter-spacing") || "";
+      document.getElementById("line-height-input").value =
+        tooltip.getAttribute("line-height") || "";
+      document.getElementById("max-width-input").value =
+        tooltip.getAttribute("max-width") || "";
     } else {
       // Clear the input fields if no tooltip is selected
       const tooltipInputs = [
-        'tooltip-input', 'align-input', 'color-input',
-        'fill-opacity-input', 'font-input', 'font-size-input',
-        'letter-spacing-input', 'line-height-input', 'max-width-input'
+        "tooltip-input",
+        "align-input",
+        "color-input",
+        "fill-opacity-input",
+        "font-input",
+        "font-size-input",
+        "letter-spacing-input",
+        "line-height-input",
+        "max-width-input",
       ];
 
-      tooltipInputs.forEach(inputId => {
+      tooltipInputs.forEach((inputId) => {
         const input = document.getElementById(inputId);
         if (input) {
-          input.value = '';
+          input.value = "";
         }
       });
     }
   }
 
-
   toggleTransformMode() {
     if (this.viewport) {
-      if (this.currentMode === 'translate') {
-        this.viewport.setTransformMode('rotate');
-        this.currentMode = 'rotate';
+      if (this.currentMode === "translate") {
+        this.viewport.setTransformMode("rotate");
+        this.currentMode = "rotate";
       } else {
-        this.viewport.setTransformMode('translate');
-        this.currentMode = 'translate';
+        this.viewport.setTransformMode("translate");
+        this.currentMode = "translate";
       }
     }
   }
@@ -262,7 +285,6 @@ class Editor {
       this.currentMode = mode; // Update the current mode
     }
   }
-
 
   deleteSelectedEntity() {
     if (this.selectEntity) {
@@ -296,19 +318,19 @@ class Editor {
   }
 
   createCamera() {
-    const existingCameras = document.querySelectorAll('.myCam');
-  
+    const existingCameras = document.querySelectorAll(".myCam");
+
     if (existingCameras.length >= 1) {
       const firstCamera = existingCameras[0];
-  
+
       // Detach transform controls from the old camera
       if (this.viewport && this.viewport.transformControls) {
         this.viewport.transformControls.detach();
       }
-  
+
       firstCamera.parentNode.removeChild(firstCamera);
     }
-  
+
     // Create the new camera entity
     this.cameraEl = document.createElement("a-entity");
     this.cameraEl.classList.add("myCam");
@@ -318,15 +340,15 @@ class Editor {
       near: 0.01,
       active: true,
     });
-  
+
     this.cameraEl.addEventListener("loaded", () => {
       this.camera = this.cameraEl.getObject3D("camera");
       this.initCamera();
-  
+
       // Reinitialize transform controls for the new camera
       this.viewport = new Viewport(this);
     });
-  
+
     this.sceneEl.appendChild(this.cameraEl);
   }
 
@@ -482,7 +504,6 @@ class Viewport {
     //     }
     //   }
     // };
-    
 
     const onStartEvent = (event) => {
       if (!event.changedTouches) {
@@ -582,36 +603,35 @@ class Viewport {
     this.transformControls.size = 0.75;
     this.transformControls.addEventListener("objectChange", (evt) => {
       const object = this.transformControls.object;
-  
+
       if (!object) {
         return;
       }
 
-      //console.log(evt, object);
-      console.log(object.rotation)
-
-      // Dispatch customEvent position
-      document.dispatchEvent(
-        new CustomEvent("objectPositionUpdate", {
-          detail: {
-            x: object.position.x,
-            y: object.position.y,
-            z: object.position.z,
-    
-          },
-        })
-      );
-
-      document.dispatchEvent(
-        new CustomEvent("objectRotationUpdate", {
+      if (object.el.id.startsWith("splat")) {
+        // Match any splat entity
+        document.dispatchEvent(
+          new CustomEvent("objectPositionUpdate", {
             detail: {
-                x: (object.rotation._x * 180) / Math.PI,
-                y: (object.rotation._y * 180) / Math.PI,
-                z: (object.rotation._z * 180) / Math.PI,
+              id: object.el.id, // Send the entity ID
+              x: object.position.x,
+              y: object.position.y,
+              z: object.position.z,
             },
-        })
-    );
-    
+          })
+        );
+
+        document.dispatchEvent(
+          new CustomEvent("objectRotationUpdate", {
+            detail: {
+              id: object.el.id, // Send the entity ID
+              x: (object.rotation._x * 180) / Math.PI,
+              y: (object.rotation._y * 180) / Math.PI,
+              z: (object.rotation._z * 180) / Math.PI,
+            },
+          })
+        );
+      }
 
       this.selectionBox.setFromObject(object).update();
     });
@@ -1544,7 +1564,7 @@ class TransformControls extends THREE.Object3D {
     this.domElement.removeEventListener("pointermove", this._onPointerHover);
     this.domElement.removeEventListener("pointermove", this._onPointerMove);
     this.domElement.removeEventListener("pointerup", this._onPointerUp);
-  
+
     this.traverse(function (child) {
       if (child.geometry) child.geometry.dispose();
       if (child.material) child.material.dispose();
@@ -1719,7 +1739,7 @@ class TransformControlsGizmo extends THREE.Object3D {
       fog: false,
       toneMapped: false,
       transparent: true,
-      side: THREE.FrontSide
+      side: THREE.FrontSide,
     });
 
     const gizmoLineMaterial = new THREE.LineBasicMaterial({

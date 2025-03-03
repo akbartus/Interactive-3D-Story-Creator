@@ -1085,25 +1085,10 @@
         }
 
 
-
+        let splatEntityId = 0;
 
         document.addEventListener('DOMContentLoaded', function () {
             // Create the model container entity dynamically
-            let modelContainer = document.createElement('a-entity');
-            modelContainer.setAttribute('id', 'model-container');
-            modelContainer.setAttribute('geometry', {
-                primitive: 'box',
-                width: 5,
-                height: 5,
-                depth: 5
-            });
-            modelContainer.setAttribute('material', {
-                color: 'white', // You can set any color you want for the frame
-                wireframe: true, // This makes the box invisible but shows its frame
-                transparent: true,
-                opacity: 0 // This makes the box itself completely transparent
-            });
-            document.querySelector('a-scene').appendChild(modelContainer);
 
             // Get reference to the file input
             let fileInput = document.getElementById('gltf-loader');
@@ -1113,28 +1098,7 @@
 
 
 
-            document.addEventListener("objectPositionUpdate", (event) => {
-                const { x, y, z } = event.detail;
 
-                // Update the position of the last added entity
-                const entities = modelContainer.querySelectorAll('a-entity');
-                if (entities.length > 0) {
-                    const lastEntity = entities[entities.length - 1];
-                    lastEntity.setAttribute('position', { x, y, z });
-                }
-            });
-
-            // Function to update rotation
-            document.addEventListener("objectRotationUpdate", (event) => {
-                const { x, y, z } = event.detail;
-
-                // Update the rotation of the last added entity
-                const entities = modelContainer.querySelectorAll('a-entity');
-                if (entities.length > 0) {
-                    const lastEntity = entities[entities.length - 1];
-                    lastEntity.setAttribute('rotation', { x, y, z });
-                }
-            });
 
 
 
@@ -1143,6 +1107,7 @@
                 const files = event.target.files;
 
                 if (files.length > 0) {
+                    splatEntityId++
                     Array.from(files).forEach(file => {
                         const url = URL.createObjectURL(file);
 
@@ -1150,11 +1115,60 @@
                         if (file.name.endsWith('.splat')) {
                             // Create a new Gaussian Splatting entity
                             const splatEntity = document.createElement('a-entity');
+
                             splatEntity.setAttribute('gaussian-splatting', `src: ${url}`);
 
-                            console.log(splatEntity.object3D)
+
                             // Add the splat entity to the scene
+                            let modelContainer = document.createElement('a-entity');
+                            modelContainer.id = `splat${splatEntityId}`;
+                            modelContainer.setAttribute('geometry', {
+                                primitive: 'box',
+                                width: 5,
+                                height: 5,
+                                depth: 5
+                            });
+                            modelContainer.setAttribute('material', {
+                                color: 'white', // You can set any color you want for the frame
+                                wireframe: true, // This makes the box invisible but shows its frame
+                                side: THREE.DoubleSide,
+                                transparent: true,
+                                opacity: 0.1,
+                                toneMapped: false,
+                                visible: false
+                            });
+                            document.querySelector('a-scene').appendChild(modelContainer);
                             modelContainer.appendChild(splatEntity);
+
+                            document.addEventListener("objectPositionUpdate", (event) => {
+                                const { id, x, y, z } = event.detail;
+
+                                // Find the specific model container by ID
+                                const modelContainer = document.getElementById(id);
+                                if (modelContainer) {
+                                    // Find the actual splat entity inside the model container
+                                    const splatEntity = modelContainer.querySelector('[gaussian-splatting]');
+                                    if (splatEntity) {
+                                        splatEntity.setAttribute('position', { x, y, z });
+                                    }
+                                }
+                            });
+
+                            // Update rotation event
+                            document.addEventListener("objectRotationUpdate", (event) => {
+                                const { id, x, y, z } = event.detail;
+
+                                // Find the specific model container by ID
+                                const modelContainer = document.getElementById(id);
+                                if (modelContainer) {
+                                    // Find the actual splat entity inside the model container
+                                    const splatEntity = modelContainer.querySelector('[gaussian-splatting]');
+                                    if (splatEntity) {
+                                        splatEntity.setAttribute('rotation', { x, y, z });
+                                    }
+                                }
+                            });
+
 
                             // Log the URL for debugging
                             console.log('Loading .splat file:', url);
@@ -1437,6 +1451,5 @@
 
     </a-scene>
 </body>
-
 
 </html>
