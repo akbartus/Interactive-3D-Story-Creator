@@ -1176,20 +1176,11 @@
                             // Create a new GLTF model entity
                             const model = document.createElement('a-entity');
                             model.setAttribute('gltf-model', `url(${url})`);
-                            model.setAttribute('position', {
-                                x: parseFloat(positionX.value) || 0,
-                                y: parseFloat(positionY.value) || 0,
-                                z: parseFloat(positionZ.value) || 0
-                            });
-                            model.setAttribute('rotation', {
-                                x: parseFloat(rotationX.value) || 0,
-                                y: parseFloat(rotationY.value) || 0,
-                                z: parseFloat(rotationZ.value) || 0
-                            });
+                
                             model.setAttribute('scale', '1 1 1');
 
                             // Add the model to the scene
-                            modelContainer.appendChild(model);
+                            document.querySelector("a-scene").appendChild(model);
                         }
 
                         // Interaction handling
