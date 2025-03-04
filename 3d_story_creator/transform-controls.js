@@ -4,7 +4,6 @@ document.addEventListener("keydown", (event) => {
     // Check for 'E' key press
     // Get the camera entity
     const cameras = document.querySelectorAll("[camera]");
-
     // Check if the camera entity exists
     if (cameras) {
       // Get the current 'active' state of the camera component
@@ -136,7 +135,7 @@ class Editor {
 
         // Get the selected alignment value
         const selectedAlignment = icon.getAttribute("data-value");
-        console.log("Selected Alignment:", selectedAlignment);
+        
 
         // Update the align-input value
         document.getElementById("align-input").value = selectedAlignment;
@@ -407,8 +406,6 @@ class Editor {
       this.entities.push(child);
     });
 
-    console.log(entity.object3D);
-
     return entity;
   }
 
@@ -599,7 +596,6 @@ class Viewport {
 
   createTransformControls() {
     this.transformControls = new TransformControls(this.camera, this.canvasEl);
-    console.log(this.transformControls);
     this.transformControls.size = 0.75;
     this.transformControls.addEventListener("objectChange", (evt) => {
       const object = this.transformControls.object;

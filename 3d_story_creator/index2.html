@@ -49,6 +49,7 @@
             overflow-y: auto;
             z-index: 1000;
             display: none;
+
             /* Initially hidden */
         }
 
@@ -78,6 +79,10 @@
 
         .panel button:hover {
             background-color: #0056b3;
+        }
+
+        #preloadGS, #preloadGLTF{
+            margin-top: 10px;
         }
 
         /* Buttons styling */
@@ -190,6 +195,7 @@
         #downloadButton {
             margin-top: 10px;
             background-color: #2196F3;
+            display: none;
         }
 
         /* Style for camera animation loader/file input */
@@ -483,6 +489,8 @@
 
                 document.getElementById('endButton').addEventListener('click', () => {
                     this.endRecording(document.getElementById('startButton'));
+                    document.getElementById('downloadButton').style.display = "block";
+
                 });
 
                 document.getElementById('downloadButton').addEventListener('click', () => {
@@ -1093,16 +1101,6 @@
             // Get reference to the file input
             let fileInput = document.getElementById('gltf-loader');
 
-
-
-
-
-
-
-
-
-
-
             fileInput.addEventListener('change', function (event) {
                 const files = event.target.files;
 
@@ -1115,9 +1113,6 @@
                         if (file.name.endsWith('.splat')) {
                             // Create a new Gaussian Splatting entity
                             const splatEntity = document.createElement('a-entity');
-
-                            splatEntity.setAttribute('gaussian-splatting', `src: ${url}`);
-
 
                             // Add the splat entity to the scene
                             let modelContainer = document.createElement('a-entity');
@@ -1139,6 +1134,8 @@
                             });
                             document.querySelector('a-scene').appendChild(modelContainer);
                             modelContainer.appendChild(splatEntity);
+                            splatEntity.setAttribute('gaussian-splatting', `src: ${url};`);
+                            //cutoutEntity: #cutout-box
 
                             document.addEventListener("objectPositionUpdate", (event) => {
                                 const { id, x, y, z } = event.detail;
@@ -1169,14 +1166,13 @@
                                 }
                             });
 
-
                             // Log the URL for debugging
                             console.log('Loading .splat file:', url);
                         } else {
                             // Create a new GLTF model entity
                             const model = document.createElement('a-entity');
                             model.setAttribute('gltf-model', `url(${url})`);
-                
+
                             model.setAttribute('scale', '1 1 1');
 
                             // Add the model to the scene
@@ -1217,7 +1213,6 @@
                 scene.setAttribute("post-processing", "effect", selectedEffect);
             });
 
-
             const speedSlider = document.getElementById('camera-speed');
             const speedValue = document.getElementById('camera-speed-value');
 
@@ -1238,9 +1233,99 @@
                 });
             }
 
+            // Add event listener for preloadGS button
+            document.getElementById('preloadGS').addEventListener('click', function () {
+                const url = 'model.splat'; // Update this path to the correct location of plush.splat
+
+                // Create a new Gaussian Splatting entity
+                const splatEntity = document.createElement('a-entity');
+
+                // Add the splat entity to the scene
+                let modelContainer = document.createElement('a-entity');
+                modelContainer.id = `splat${splatEntityId}`;
+                modelContainer.setAttribute('geometry', {
+                    primitive: 'box',
+                    width: 5,
+                    height: 5,
+                    depth: 5
+                });
+                modelContainer.setAttribute('material', {
+                    color: 'white', // You can set any color you want for the frame
+                    wireframe: true, // This makes the box invisible but shows its frame
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.1,
+                    toneMapped: false,
+                    visible: false
+                });
+                document.querySelector('a-scene').appendChild(modelContainer);
+                modelContainer.appendChild(splatEntity);
+                splatEntity.setAttribute('gaussian-splatting', `src: ${url};`);
+
+                document.addEventListener("objectPositionUpdate", (event) => {
+                    const { id, x, y, z } = event.detail;
+
+                    // Find the specific model container by ID
+                    const modelContainer = document.getElementById(id);
+                    if (modelContainer) {
+                        // Find the actual splat entity inside the model container
+                        const splatEntity = modelContainer.querySelector('[gaussian-splatting]');
+                        if (splatEntity) {
+                            splatEntity.setAttribute('position', { x, y, z });
+                        }
+                    }
+                });
+
+                // Update rotation event
+                document.addEventListener("objectRotationUpdate", (event) => {
+                    const { id, x, y, z } = event.detail;
+
+                    // Find the specific model container by ID
+                    const modelContainer = document.getElementById(id);
+                    if (modelContainer) {
+                        // Find the actual splat entity inside the model container
+                        const splatEntity = modelContainer.querySelector('[gaussian-splatting]');
+                        if (splatEntity) {
+                            splatEntity.setAttribute('rotation', { x, y, z });
+                        }
+                    }
+                });
+
+                // Log the URL for debugging
+                console.log('Loading .splat file:', url);
+                const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+                const STARTEVENT = isTouch ? "touchstart" : "mousedown";
+                const ENDEVENT = isTouch ? "touchend" : "mouseup";
+
+                window.setTimeout(() => {
+                    new Editor();
+                }, 100);
+            });
+
+            document.getElementById('preloadGLTF').addEventListener('click', function () {
+                const url = 'duck.gltf'; // Update this path to the correct location of sample.gltf
+
+                // Create a new GLTF model entity
+                const model = document.createElement('a-entity');
+                model.setAttribute('gltf-model', `url(${url})`);
+                model.setAttribute('scale', '1 1 1');
+
+                // Add the model to the scene
+                document.querySelector("a-scene").appendChild(model);
+
+                // Log the URL for debugging
+                console.log('Loading .gltf file:', url);
+                const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+                const STARTEVENT = isTouch ? "touchstart" : "mousedown";
+                const ENDEVENT = isTouch ? "touchend" : "mouseup";
+
+                window.setTimeout(() => {
+                    new Editor();
+                }, 100);
+            });
         });
-
-
+       
+   
 
     </script>
 </head>
@@ -1291,8 +1376,9 @@
         <h2>Upload 3D File</h2>
         <label>Upload .splat, .gltf or .glb files</label>
         <input type="file" id="gltf-loader" accept=".gltf,.glb,.splat" multiple>
+        <button id="preloadGS">Load sample Gaussian Splat file.</button>
+        <button id="preloadGLTF">Load sample GLTF file.</button>
 
-        <!-- Position Input -->
 
     </div>
 
@@ -1355,11 +1441,40 @@
 
     <!-- Camera panel -->
     <div id="camera-panel" class="panel">
-        <h2>Record Camera Animation</h2>
+        <h3>Camera Animation Options</h3>
+        <!-- Display frame count and duration -->
+        <div>
+            <p>Current Frame: <span id="currentFrame">0</span></p>
+            <p>Total Frames: <span id="frameCount">0</span></p>
+            <p>Duration: <span id="duration">0.00</span> seconds</p>
+
+        </div>
+
         <label for="camera-speed">Camera Speed:</label>
         <span id="camera-speed-value">10</span>
         <input type="range" id="camera-speed" min="1" max="100" value="10">
 
+
+
+        <button id="startButton">Start Recording</button>
+        <button id="endButton">End Recording</button>
+        <button id="downloadButton">Download Camera Data</button>
+
+
+
+
+        <div id="testAnimation">
+            <h2>Test Camera Animation</h2>
+            <input type="file" id="fileInput" accept="application/json">
+        </div>
+    </div>
+
+    <!-- Scroll panel -->
+    <div id="scroll-panel" class="panel">
+        <h3>Scrollytelling Options</h3>
+        <label>Load generated JSON file: </label>
+        <input type="file" id="fileInput2" accept="application/json">
+        <br>
         <label for="effect-select">Choose post-processing effect:</label>
         <select id="effect-select">
             <option value="none">None</option>
@@ -1376,34 +1491,6 @@
             <option value="bad-tv">Bad TV</option>
         </select>
 
-        <button id="startButton">Start Recording</button>
-        <button id="endButton">End Recording</button>
-        <button id="downloadButton">Download Camera Data</button>
-
-        <!-- Display frame count and duration -->
-        <div>
-            <p>Current Frame: <span id="currentFrame">0</span></p>
-            <p>Total Frames: <span id="frameCount">0</span></p>
-            <p>Duration: <span id="duration">0.00</span> seconds</p>
-
-        </div>
-
-
-        <div id="testAnimation">
-            <h2>Test Camera Animation</h2>
-            <input type="file" id="fileInput" accept="application/json">
-        </div>
-    </div>
-
-    <!-- Scroll panel -->
-    <div id="scroll-panel" class="panel">
-        <h2>Scrollytelling</h2>
-        <input type="file" id="fileInput2" accept="application/json">
-        <br>
-        <label for="speed-slider">Animation Speed:</label>
-        <span class="speed-value">10</span>
-        <input type="range" id="speed-slider" min="1" max="50" value="10">
-
         <!-- Display current frame, total frames, and duration -->
         <div>
             <p>Current Frame: <span id="currentFrame2">0</span></p>
@@ -1411,16 +1498,25 @@
             <p>Duration: <span id="duration2">0.00</span> seconds</p>
         </div>
 
-        <!-- Add "This Frame" slider -->
-        <label for="frame-slider">This Frame:</label>
-        <input type="range" id="frame-slider" min="0" max="0" value="0">
-        <span id="frame-slider-value">0</span>
+        <label for="speed-slider">Animation Speed:</label>
+        <span class="speed-value">10</span>
+        <input type="range" id="speed-slider" min="1" max="50" value="10">
 
-        <label>Textual Content</label>
+
+
+        <!-- Add "This Frame" slider -->
+        <label>Frames Slider:</label>
+        <span id="frame-slider-value">0</span>
+        <input type="range" id="frame-slider" min="0" max="0" value="0">
+
+        <h3>Sliding Text Options</h3>
         <div class="text-inputs-container">
             <div class="text-input-row">
+                <label>Enter text:</label>
                 <input type="text" class="scrollableText" placeholder="Enter text...">
+                <label>Frame number for text appearance:</label>
                 <input type="number" class="frameNumber" placeholder="Frame number">
+                <label>Text visibility duration (in frames)</label>
                 <input type="number" class="durationFrames" placeholder="Duration in frames" min="1" value="10">
             </div>
         </div>
@@ -1436,8 +1532,9 @@
 
     <!-- A-Frame scene -->
     <a-scene xr-mode-ui="enabled: false" post-processing="effect: none">
+        <!-- <a-box id="cutout-box" visible="false" scale="10 10 10" position="0.8145 1.73322 -2.35981"></a-box> -->
         <a-entity camera-movement-recorder camera-movement-animator scroll-animator wasd-controls="acceleration:10"
-            look-controls tooltip-component camera position="5.132 1.6 7.237"></a-entity>
+            look-controls camera tooltip-component position="5.132 1.6 7.237"></a-entity>
         <a-grid position="0 -0.1 0"></a-grid>
 
     </a-scene>
