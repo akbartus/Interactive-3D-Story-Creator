@@ -2844,3 +2844,8 @@ const STARTEVENT = (() => {
 const ENDEVENT = (() => {
   return isTouch ? "touchend" : "mouseup";
 })();
+
+
+// window.setTimeout(() => {
+// new Editor();
+// }, 100);

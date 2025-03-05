@@ -1352,253 +1352,632 @@ const BadTVShader = {
     return params;
   }
   
-  AFRAME.registerComponent("post-processing", {
-    schema: {
-      effect: { type: "string", default: "none" },
-      halftoneParams: {
-        type: "string",
-        default:
-          "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false",
-      },
-      oldFilmParams: {
-        type: "string",
-        default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256",
-      },
-      pixelParams: {
-        type: "string",
-        default:
-          "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4",
-      },
-      glitchParams: { type: "string", default: "goWild: false, enabled: true" },
-      sobelParams: { type: "string", default: "enabled: true" },
-      bloomParams: {
-        type: "string",
-        default: "threshold: 0, strength: 0.4, radius: 0, exposure: 1",
-      },
-      dotScreenParams: { type: "string", default: "scale: 4, angle: 90" },
-      volumetricLightParams: {
-        type: "string",
-        default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50",
-      },
-      afterimageParams: { type: "string", default: "damp: 0.8" },
-      badTVParams: {
-        type: "string",
-        default:
-          "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0",
-      },
-    },
+  // AFRAME.registerComponent("post-processing", {
+  //   schema: {
+  //     effect: { type: "string", default: "none" },
+  //     halftoneParams: {
+  //       type: "string",
+  //       default:
+  //         "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false",
+  //     },
+  //     oldFilmParams: {
+  //       type: "string",
+  //       default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256",
+  //     },
+  //     pixelParams: {
+  //       type: "string",
+  //       default:
+  //         "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4",
+  //     },
+  //     glitchParams: { type: "string", default: "goWild: false, enabled: true" },
+  //     sobelParams: { type: "string", default: "enabled: true" },
+  //     bloomParams: {
+  //       type: "string",
+  //       default: "threshold: 0, strength: 0.4, radius: 0, exposure: 1",
+  //     },
+  //     dotScreenParams: { type: "string", default: "scale: 4, angle: 90" },
+  //     volumetricLightParams: {
+  //       type: "string",
+  //       default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50",
+  //     },
+  //     afterimageParams: { type: "string", default: "damp: 0.8" },
+  //     badTVParams: {
+  //       type: "string",
+  //       default:
+  //         "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0",
+  //     },
+  //   },
   
-    init: function () {
-      // Ensure the renderer is properly assigned
-      this.renderer = this.el.sceneEl.renderer;
-      this.camera = this.el.camera;
-      this.scene = this.el.object3D;
+  //   init: function () {
+  //     // Ensure the renderer is properly assigned
+  //     this.renderer = this.el.sceneEl.renderer;
+  //     this.camera = this.el.camera;
+  //     this.scene = this.el.object3D;
   
-      if (!this.renderer) {
-        console.error("Renderer is not available. Ensure the scene is properly initialized.");
-        return;
+  //     if (!this.renderer) {
+  //       console.error("Renderer is not available. Ensure the scene is properly initialized.");
+  //       return;
+  //     }
+  
+  //     // Store the original render function
+  //     this.originalRender = this.renderer.render;
+  
+  //     this.setupEffect();
+  //   },
+  
+  //   update: function () {
+  //     this.setupEffect();
+  //   },
+  
+  //   setupEffect: function () {
+  //     // Clear existing composer if it exists
+  //     if (this.composer) {
+  //       this.composer.passes = [];
+  //       this.composer = null;
+  //     }
+  
+  //     if (this.occlusionComposer) {
+  //       this.occlusionComposer.passes = [];
+  //       this.occlusionComposer = null;
+  //     }
+  
+  //     // Restore the original render function if the effect is "none"
+  //     if (this.data.effect === "none") {
+  //       this.renderer.render = this.originalRender;
+  //       return;
+  //     }
+  
+  //     // Initialize EffectComposer with the renderer
+  //     this.composer = new EffectComposer(this.renderer);
+  
+  //     // Add a render pass for the scene and camera
+  //     const renderPass = new RenderPass(this.scene, this.camera);
+  //     this.composer.addPass(renderPass);
+  
+  //     // Add the selected effect pass
+  //     if (this.data.effect === "sketchy-pencil") {
+  //       const pencilLinesPass = new PencilLinesPass({
+  //         width: this.renderer.domElement.clientWidth,
+  //         height: this.renderer.domElement.clientHeight,
+  //         scene: this.scene,
+  //         camera: this.camera,
+  //       });
+  //       pencilLinesPass.renderToScreen = false;
+  //       this.composer.addPass(pencilLinesPass);
+  //     } else if (this.data.effect === "halftone") {
+  //       const halftoneParams = getParams(this.data.halftoneParams);
+  //       const halftonePass = new HalftonePass(window.innerWidth, window.innerHeight, halftoneParams);
+  //       this.composer.addPass(halftonePass);
+  //     } else if (this.data.effect === "old-film") {
+  //       const oldFilmParams = getParams(this.data.oldFilmParams);
+  //       const filmPass = new FilmPass();
+  //       filmPass.material.uniforms.grayscale.value = oldFilmParams.grayscale;
+  //       filmPass.material.uniforms.nIntensity.value = oldFilmParams.nIntensity;
+  //       filmPass.material.uniforms.sIntensity.value = oldFilmParams.sIntensity;
+  //       filmPass.material.uniforms.sCount.value = oldFilmParams.sCount;
+  //       this.composer.addPass(filmPass);
+  //       const vignettePass = new ShaderPass(VignetteShader);
+  //       vignettePass.uniforms.offset.value = 1.5;
+  //       vignettePass.uniforms.darkness.value = 0.9;
+  //       vignettePass.renderToScreen = true;
+  //       this.composer.addPass(vignettePass);
+  //     } else if (this.data.effect === "pixel") {
+  //       const pixelParams = getParams(this.data.pixelParams);
+  //       const pixelPass = new RenderPixelatedPass(pixelParams.pixelSize, this.scene, this.camera, pixelParams);
+  //       this.composer.addPass(pixelPass);
+  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+  //       this.composer.addPass(gammaCorrectionPass);
+  //     } else if (this.data.effect === "glitch") {
+  //       const glitchParams = getParams(this.data.glitchParams);
+  //       const glitchPass = new GlitchPass();
+  //       glitchPass.goWild = glitchParams.goWild;
+  //       glitchPass.enabled = glitchParams.enabled;
+  //       this.composer.addPass(glitchPass);
+  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+  //       this.composer.addPass(gammaCorrectionPass);
+  //     } else if (this.data.effect === "sobel") {
+  //       const sobelParams = getParams(this.data.sobelParams);
+  //       const sobelPass = new ShaderPass(SobelOperatorShader);
+  //       sobelPass.enabled = sobelParams.enabled;
+  //       sobelPass.uniforms.resolution.value.x = window.innerWidth * window.devicePixelRatio;
+  //       sobelPass.uniforms.resolution.value.y = window.innerHeight * window.devicePixelRatio;
+  //       this.composer.addPass(sobelPass);
+  //     } else if (this.data.effect === "bloom") {
+  //       const bloomParams = getParams(this.data.bloomParams);
+  //       const bloomPass = new UnrealBloomPass(
+  //         new THREE.Vector2(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight),
+  //         1.5,
+  //         0.4,
+  //         0.85
+  //       );
+  //       bloomPass.threshold = bloomParams.threshold;
+  //       bloomPass.strength = bloomParams.strength;
+  //       bloomPass.radius = bloomParams.radius;
+  //       this.composer.addPass(bloomPass);
+  //       const outputPass = new OutputPass(THREE.ReinhardToneMapping);
+  //       outputPass.toneMappingExposure = bloomParams.exposure;
+  //       this.composer.addPass(outputPass);
+  //     } else if (this.data.effect === "dot-screen") {
+  //       const dotScreenParams = getParams(this.data.dotScreenParams);
+  //       const dotScreenPass = new ShaderPass(DotScreenShader);
+  //       dotScreenPass.uniforms.scale.value = dotScreenParams.scale;
+  //       dotScreenPass.uniforms.angle.value = dotScreenParams.angle;
+  //       this.composer.addPass(dotScreenPass);
+  //       const rgbShiftPass = new ShaderPass(RGBShiftShader);
+  //       rgbShiftPass.uniforms.amount.value = 0.0015;
+  //       this.composer.addPass(rgbShiftPass);
+  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+  //       this.composer.addPass(gammaCorrectionPass);
+  //     } else if (this.data.effect === "volumetric-light") {
+  //       this.DEFAULT_LAYER = 0;
+  //       this.OCCLUSION_LAYER = 1;
+  //       const renderTarget = new THREE.WebGLRenderTarget(
+  //         0.5 * this.renderer.domElement.clientWidth,
+  //         0.5 * this.renderer.domElement.clientHeight
+  //       );
+  //       this.occlusionComposer = new EffectComposer(this.renderer, renderTarget);
+  //       this.occlusionComposer.addPass(new RenderPass(this.scene, this.camera));
+  //       const volumetricLightParams = getParams(this.data.volumetricLightParams);
+  //       const volumetricLightPass = new ShaderPass(VolumetericLightShader);
+  //       volumetricLightPass.uniforms.decay.value = volumetricLightParams.decay;
+  //       volumetricLightPass.uniforms.density.value = volumetricLightParams.density;
+  //       volumetricLightPass.uniforms.exposure.value = volumetricLightParams.exposure;
+  //       volumetricLightPass.uniforms.samples.value = volumetricLightParams.samples;
+  //       this.occlusionComposer.addPass(volumetricLightPass);
+  //       this.composer = new EffectComposer(this.renderer);
+  //       this.composer.addPass(new RenderPass(this.scene, this.camera));
+  //       const additiveBlendingPass = new ShaderPass(AdditiveBlendingShader);
+  //       additiveBlendingPass.uniforms.tAdd.value = renderTarget.texture;
+  //       this.composer.addPass(additiveBlendingPass);
+  //       additiveBlendingPass.renderToScreen = true;
+  //       this.camera.layers.set(this.OCCLUSION_LAYER);
+  //       this.renderer.setClearColor(0);
+  //       this.occlusionComposer.render();
+  //       this.camera.layers.set(this.DEFAULT_LAYER);
+  //       this.renderer.setClearColor(591377);
+  //     } else if (this.data.effect === "afterimage") {
+  //       const afterimageParams = getParams(this.data.afterimageParams);
+  //       const afterimagePass = new AfterimagePass();
+  //       afterimagePass.uniforms.damp.value = afterimageParams.damp;
+  //       this.composer.addPass(afterimagePass);
+  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+  //       this.composer.addPass(gammaCorrectionPass);
+  //     } else if (this.data.effect === "bad-tv") {
+  //       const badTVParams = getParams(this.data.badTVParams);
+  //       const badTVPass = new ShaderPass(BadTVShader);
+  //       const rgbShiftPass = new ShaderPass(RGBShiftShader);
+  //       const filmPass = new ShaderPass(FilmShader);
+  //       const staticPass = new ShaderPass(StaticShader);
+  //       const copyPass = new ShaderPass(CopyShader);
+  //       filmPass.uniforms.grayscale.value = 0;
+  //       const staticParams = { show: true, amount: 0.5, size: 4 };
+  //       const rgbShiftParams = { show: true, amount: 0.005, angle: 0 };
+  //       const filmParams = { show: true, count: 800, sIntensity: 0.9, nIntensity: 0.4 };
+  //       let time = 0;
+  //       const animate = () => {
+  //         time += 0.1;
+  //         badTVPass.uniforms.time.value = time;
+  //         filmPass.uniforms.time.value = time;
+  //         staticPass.uniforms.time.value = time;
+  //         requestAnimationFrame(animate);
+  //       };
+  //       badTVPass.uniforms.distortion.value = badTVParams.distortion;
+  //       badTVPass.uniforms.distortion2.value = badTVParams.distortion2;
+  //       badTVPass.uniforms.speed.value = badTVParams.speed;
+  //       badTVPass.uniforms.rollSpeed.value = badTVParams.rollSpeed;
+  //       staticPass.uniforms.amount.value = staticParams.amount;
+  //       staticPass.uniforms.size.value = staticParams.size;
+  //       rgbShiftPass.uniforms.angle.value = rgbShiftParams.angle * Math.PI;
+  //       rgbShiftPass.uniforms.amount.value = rgbShiftParams.amount;
+  //       filmPass.uniforms.sCount.value = filmParams.count;
+  //       filmPass.uniforms.sIntensity.value = filmParams.sIntensity;
+  //       filmPass.uniforms.nIntensity.value = filmParams.nIntensity;
+  //       this.composer.addPass(badTVPass);
+  //       this.composer.addPass(rgbShiftPass);
+  //       this.composer.addPass(filmPass);
+  //       this.composer.addPass(staticPass);
+  //       this.composer.addPass(copyPass);
+  //       animate();
+  //     }
+  
+  //     this.bind();
+  //   },
+  
+  //   bind: function () {
+  //     const self = this;
+  //     let isRendering = false;
+  
+  //     this.renderer.render = function () {
+  //       if (isRendering) {
+  //         self.originalRender.apply(this, arguments);
+  //       } else {
+  //         isRendering = true;
+  //         if (self.occlusionComposer) {
+  //           self.occlusionComposer.render(self.delta);
+  //         } else if (self.composer) {
+  //           self.composer.render(self.delta);
+  //         }
+  //         isRendering = false;
+  //       }
+  //     };
+  //   },
+// });
+  
+AFRAME.registerComponent("post-processing", {
+  schema: {
+    effect: { type: "string", default: "none" },
+    sketchyPencilParams: { type: "string", default: "none" },
+    halftoneParams: { type: "string", default: "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false" },
+    oldFilmParams: { type: "string", default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256" },
+    pixelParams: { type: "string", default: "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4" },
+    glitchParams: { type: "string", default: "goWild: false, enabled: true" },
+    sobelParams: { type: "string", default: "enabled: true" },
+    bloomParams: { type: "string", default: "threshold: 0.1, strength: 0.4, radius: 0.1, exposure: 1" },
+    dotScreenParams: { type: "string", default: "scale: 4, angle: 90" },
+    volumetricLightParams: { type: "string", default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50" },
+    afterimageParams: { type: "string", default: "damp: 0.8" },
+    badTVParams: { type: "string", default: "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0" },
+  },
+
+  init: function () {
+    this.renderer = this.el.sceneEl.renderer;
+    this.camera = this.el.camera;
+    this.scene = this.el.object3D;
+
+    if (!this.renderer) {
+      console.error("Renderer is not available. Ensure the scene is properly initialized.");
+      return;
+    }
+
+    this.originalRender = this.renderer.render;
+    this.setupEffect();
+
+    // Listen for changes in the effect select dropdown
+    const effectSelect = document.getElementById('effect-select');
+    effectSelect.addEventListener('change', (event) => {
+      this.el.setAttribute('post-processing', 'effect', event.target.value);
+      this.updateEffectParamsUI(event.target.value);
+    });
+  },
+
+  update: function () {
+    this.setupEffect();
+  },
+
+  updateEffectParamsUI: function (effect) {
+    const paramsContainer = document.getElementById('effect-params');
+    paramsContainer.innerHTML = ''; // Clear previous parameters
+  
+    if (effect === 'none') return;
+  
+    const params = this.getEffectParams(effect);
+    if (Object.keys(params).length === 0) {
+      paramsContainer.innerHTML = '<p>No parameters available for this effect.</p>';
+      return;
+    }
+  
+    for (const [key, value] of Object.entries(params)) {
+      // Create a container for each parameter
+      const paramContainer = document.createElement('div');
+      paramContainer.style.marginBottom = '10px';
+  
+      // Create a label for the parameter
+      const label = document.createElement('label');
+      label.htmlFor = `param-${key}`;
+      label.textContent = key;
+      paramContainer.appendChild(label);
+  
+      // Create a range input for the parameter
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.id = `param-${key}`;
+  
+      // Determine if the parameter is a whole number or a float
+      const isWholeNumber = Number.isInteger(value);
+  
+      // Set min, max, and step based on the parameter type
+      if (isWholeNumber) {
+        input.min = 0; // Minimum value for whole numbers
+        input.max = value * 5; // Set max to double the default value (or any other reasonable limit)
+        input.step = 1; // Step size for whole numbers
+      } else {
+        input.min = 0; // Minimum value for floats
+        input.max = 1; // Maximum value for floats (adjust as needed)
+        input.step = 0.01; // Step size for fine-tuning floats
       }
   
-      // Store the original render function
-      this.originalRender = this.renderer.render;
+      input.value = value;
   
-      this.setupEffect();
-    },
+      // Create a span to display the current value
+      const valueDisplay = document.createElement('span');
+      valueDisplay.textContent = `: ${value}`;
+      paramContainer.appendChild(valueDisplay);
   
-    update: function () {
-      this.setupEffect();
-    },
+      // Update the value display and effect parameter when the slider changes
+      input.addEventListener('input', (event) => {
+        const newValue = parseFloat(event.target.value);
+        valueDisplay.textContent = `: ${isWholeNumber ? newValue : newValue.toFixed(2)}`; // Display value with 2 decimal places for floats
+        this.updateEffectParam(effect, key, newValue);
+      });
   
-    setupEffect: function () {
-      // Clear existing composer if it exists
-      if (this.composer) {
-        this.composer.passes = [];
-        this.composer = null;
+      paramContainer.appendChild(input);
+      paramsContainer.appendChild(paramContainer);
+    }
+  },
+
+  getEffectParams: function (effect) {
+    const effectToSchemaMap = {
+      "sketchy-pencil": "sketchyPencilParams", // Ensure this mapping is correct
+      "halftone": "halftoneParams",
+      "old-film": "oldFilmParams",
+      "pixel": "pixelParams",
+      "glitch": "glitchParams",
+      "sobel": "sobelParams",
+      "bloom": "bloomParams",
+      "dot-screen": "dotScreenParams",
+      "volumetric-light": "volumetricLightParams",
+      "afterimage": "afterimageParams",
+      "bad-tv": "badTVParams",
+    };
+  
+    const schemaProperty = effectToSchemaMap[effect];
+    if (!schemaProperty) {
+      console.error(`No parameters found for effect: ${effect}`);
+      return {};
+    }
+  
+    const paramsString = this.data[schemaProperty];
+    if (!paramsString) {
+      console.error(`Parameters string is undefined for effect: ${effect}`);
+      return {};
+    }
+  
+    return this.parseParams(paramsString);
+  },
+
+  parseParams: function (paramsString) {
+    const params = {};
+    if (!paramsString || typeof paramsString !== "string") {
+      return params;
+    }
+  
+    // Split the string by commas and trim whitespace
+    paramsString.split(',').forEach(param => {
+      const [key, value] = param.split(':').map(s => s.trim());
+      if (key && value && !isNaN(value)) {
+        params[key] = parseFloat(value);
       }
+    });
   
-      if (this.occlusionComposer) {
-        this.occlusionComposer.passes = [];
-        this.occlusionComposer = null;
-      }
+    return params;
+  },
+
+  updateEffectParam: function (effect, param, value) {
+    const effectToSchemaMap = {
+      "sketchy-pencil": "sketchyPencilParams",
+      "halftone": "halftoneParams",
+      "old-film": "oldFilmParams",
+      "pixel": "pixelParams",
+      "glitch": "glitchParams",
+      "sobel": "sobelParams",
+      "bloom": "bloomParams",
+      "dot-screen": "dotScreenParams",
+      "volumetric-light": "volumetricLightParams",
+      "afterimage": "afterimageParams",
+      "bad-tv": "badTVParams",
+    };
   
-      // Restore the original render function if the effect is "none"
-      if (this.data.effect === "none") {
-        this.renderer.render = this.originalRender;
-        return;
-      }
+    const schemaProperty = effectToSchemaMap[effect];
+    if (!schemaProperty) {
+      console.error(`No schema property found for effect: ${effect}`);
+      return;
+    }
   
-      // Initialize EffectComposer with the renderer
+    // Get the current parameters for the effect
+    const params = this.getEffectParams(effect);
+    params[param] = value;
+  
+    // Update the schema property with the new parameters
+    this.data[schemaProperty] = Object.entries(params)
+      .map(([key, val]) => `${key}: ${val}`)
+      .join(', ');
+  
+    // Re-apply the effect with the updated parameters
+    this.setupEffect();
+  },
+
+
+  setupEffect: function () {
+    // Clear existing composer if it exists
+    if (this.composer) {
+      this.composer.passes = [];
+      this.composer = null;
+    }
+
+    if (this.occlusionComposer) {
+      this.occlusionComposer.passes = [];
+      this.occlusionComposer = null;
+    }
+
+    // Restore the original render function if the effect is "none"
+    if (this.data.effect === "none") {
+      this.renderer.render = this.originalRender;
+      return;
+    }
+
+    // Initialize EffectComposer with the renderer
+    this.composer = new EffectComposer(this.renderer);
+
+    // Add a render pass for the scene and camera
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+
+    // Add the selected effect pass
+    if (this.data.effect === "sketchy-pencil") {
+      const pencilLinesPass = new PencilLinesPass({
+        width: this.renderer.domElement.clientWidth,
+        height: this.renderer.domElement.clientHeight,
+        scene: this.scene,
+        camera: this.camera,
+      });
+      pencilLinesPass.renderToScreen = false;
+      this.composer.addPass(pencilLinesPass);
+    } else if (this.data.effect === "halftone") {
+      const halftoneParams = getParams(this.data.halftoneParams);
+      const halftonePass = new HalftonePass(window.innerWidth, window.innerHeight, halftoneParams);
+      this.composer.addPass(halftonePass);
+    } else if (this.data.effect === "old-film") {
+      const oldFilmParams = getParams(this.data.oldFilmParams);
+      const filmPass = new FilmPass();
+      filmPass.material.uniforms.grayscale.value = oldFilmParams.grayscale;
+      filmPass.material.uniforms.nIntensity.value = oldFilmParams.nIntensity;
+      filmPass.material.uniforms.sIntensity.value = oldFilmParams.sIntensity;
+      filmPass.material.uniforms.sCount.value = oldFilmParams.sCount;
+      this.composer.addPass(filmPass);
+      const vignettePass = new ShaderPass(VignetteShader);
+      vignettePass.uniforms.offset.value = 1.5;
+      vignettePass.uniforms.darkness.value = 0.9;
+      vignettePass.renderToScreen = true;
+      this.composer.addPass(vignettePass);
+    } else if (this.data.effect === "pixel") {
+      const pixelParams = getParams(this.data.pixelParams);
+      const pixelPass = new RenderPixelatedPass(pixelParams.pixelSize, this.scene, this.camera, pixelParams);
+      this.composer.addPass(pixelPass);
+      const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+      this.composer.addPass(gammaCorrectionPass);
+    } else if (this.data.effect === "glitch") {
+      const glitchParams = getParams(this.data.glitchParams);
+      const glitchPass = new GlitchPass();
+      glitchPass.goWild = glitchParams.goWild;
+      glitchPass.enabled = glitchParams.enabled;
+      this.composer.addPass(glitchPass);
+      const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+      this.composer.addPass(gammaCorrectionPass);
+    } else if (this.data.effect === "sobel") {
+      const sobelParams = getParams(this.data.sobelParams);
+      const sobelPass = new ShaderPass(SobelOperatorShader);
+      sobelPass.enabled = sobelParams.enabled;
+      sobelPass.uniforms.resolution.value.x = window.innerWidth * window.devicePixelRatio;
+      sobelPass.uniforms.resolution.value.y = window.innerHeight * window.devicePixelRatio;
+      this.composer.addPass(sobelPass);
+    } else if (this.data.effect === "bloom") {
+      const bloomParams = getParams(this.data.bloomParams);
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight),
+        1.5,
+        0.4,
+        0.85
+      );
+      bloomPass.threshold = bloomParams.threshold;
+      bloomPass.strength = bloomParams.strength;
+      bloomPass.radius = bloomParams.radius;
+      this.composer.addPass(bloomPass);
+      const outputPass = new OutputPass(THREE.ReinhardToneMapping);
+      outputPass.toneMappingExposure = bloomParams.exposure;
+      this.composer.addPass(outputPass);
+    } else if (this.data.effect === "dot-screen") {
+      const dotScreenParams = getParams(this.data.dotScreenParams);
+      const dotScreenPass = new ShaderPass(DotScreenShader);
+      dotScreenPass.uniforms.scale.value = dotScreenParams.scale;
+      dotScreenPass.uniforms.angle.value = dotScreenParams.angle;
+      this.composer.addPass(dotScreenPass);
+      const rgbShiftPass = new ShaderPass(RGBShiftShader);
+      rgbShiftPass.uniforms.amount.value = 0.0015;
+      this.composer.addPass(rgbShiftPass);
+      const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+      this.composer.addPass(gammaCorrectionPass);
+    } else if (this.data.effect === "volumetric-light") {
+      this.DEFAULT_LAYER = 0;
+      this.OCCLUSION_LAYER = 1;
+      const renderTarget = new THREE.WebGLRenderTarget(
+        0.5 * this.renderer.domElement.clientWidth,
+        0.5 * this.renderer.domElement.clientHeight
+      );
+      this.occlusionComposer = new EffectComposer(this.renderer, renderTarget);
+      this.occlusionComposer.addPass(new RenderPass(this.scene, this.camera));
+      const volumetricLightParams = getParams(this.data.volumetricLightParams);
+      const volumetricLightPass = new ShaderPass(VolumetericLightShader);
+      volumetricLightPass.uniforms.decay.value = volumetricLightParams.decay;
+      volumetricLightPass.uniforms.density.value = volumetricLightParams.density;
+      volumetricLightPass.uniforms.exposure.value = volumetricLightParams.exposure;
+      volumetricLightPass.uniforms.samples.value = volumetricLightParams.samples;
+      this.occlusionComposer.addPass(volumetricLightPass);
       this.composer = new EffectComposer(this.renderer);
-  
-      // Add a render pass for the scene and camera
-      const renderPass = new RenderPass(this.scene, this.camera);
-      this.composer.addPass(renderPass);
-  
-      // Add the selected effect pass
-      if (this.data.effect === "sketchy-pencil") {
-        const pencilLinesPass = new PencilLinesPass({
-          width: this.renderer.domElement.clientWidth,
-          height: this.renderer.domElement.clientHeight,
-          scene: this.scene,
-          camera: this.camera,
-        });
-        pencilLinesPass.renderToScreen = false;
-        this.composer.addPass(pencilLinesPass);
-      } else if (this.data.effect === "halftone") {
-        const halftoneParams = getParams(this.data.halftoneParams);
-        const halftonePass = new HalftonePass(window.innerWidth, window.innerHeight, halftoneParams);
-        this.composer.addPass(halftonePass);
-      } else if (this.data.effect === "old-film") {
-        const oldFilmParams = getParams(this.data.oldFilmParams);
-        const filmPass = new FilmPass();
-        filmPass.material.uniforms.grayscale.value = oldFilmParams.grayscale;
-        filmPass.material.uniforms.nIntensity.value = oldFilmParams.nIntensity;
-        filmPass.material.uniforms.sIntensity.value = oldFilmParams.sIntensity;
-        filmPass.material.uniforms.sCount.value = oldFilmParams.sCount;
-        this.composer.addPass(filmPass);
-        const vignettePass = new ShaderPass(VignetteShader);
-        vignettePass.uniforms.offset.value = 1.5;
-        vignettePass.uniforms.darkness.value = 0.9;
-        vignettePass.renderToScreen = true;
-        this.composer.addPass(vignettePass);
-      } else if (this.data.effect === "pixel") {
-        const pixelParams = getParams(this.data.pixelParams);
-        const pixelPass = new RenderPixelatedPass(pixelParams.pixelSize, this.scene, this.camera, pixelParams);
-        this.composer.addPass(pixelPass);
-        const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-        this.composer.addPass(gammaCorrectionPass);
-      } else if (this.data.effect === "glitch") {
-        const glitchParams = getParams(this.data.glitchParams);
-        const glitchPass = new GlitchPass();
-        glitchPass.goWild = glitchParams.goWild;
-        glitchPass.enabled = glitchParams.enabled;
-        this.composer.addPass(glitchPass);
-        const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-        this.composer.addPass(gammaCorrectionPass);
-      } else if (this.data.effect === "sobel") {
-        const sobelParams = getParams(this.data.sobelParams);
-        const sobelPass = new ShaderPass(SobelOperatorShader);
-        sobelPass.enabled = sobelParams.enabled;
-        sobelPass.uniforms.resolution.value.x = window.innerWidth * window.devicePixelRatio;
-        sobelPass.uniforms.resolution.value.y = window.innerHeight * window.devicePixelRatio;
-        this.composer.addPass(sobelPass);
-      } else if (this.data.effect === "bloom") {
-        const bloomParams = getParams(this.data.bloomParams);
-        const bloomPass = new UnrealBloomPass(
-          new THREE.Vector2(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight),
-          1.5,
-          0.4,
-          0.85
-        );
-        bloomPass.threshold = bloomParams.threshold;
-        bloomPass.strength = bloomParams.strength;
-        bloomPass.radius = bloomParams.radius;
-        this.composer.addPass(bloomPass);
-        const outputPass = new OutputPass(THREE.ReinhardToneMapping);
-        outputPass.toneMappingExposure = bloomParams.exposure;
-        this.composer.addPass(outputPass);
-      } else if (this.data.effect === "dot-screen") {
-        const dotScreenParams = getParams(this.data.dotScreenParams);
-        const dotScreenPass = new ShaderPass(DotScreenShader);
-        dotScreenPass.uniforms.scale.value = dotScreenParams.scale;
-        dotScreenPass.uniforms.angle.value = dotScreenParams.angle;
-        this.composer.addPass(dotScreenPass);
-        const rgbShiftPass = new ShaderPass(RGBShiftShader);
-        rgbShiftPass.uniforms.amount.value = 0.0015;
-        this.composer.addPass(rgbShiftPass);
-        const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-        this.composer.addPass(gammaCorrectionPass);
-      } else if (this.data.effect === "volumetric-light") {
-        this.DEFAULT_LAYER = 0;
-        this.OCCLUSION_LAYER = 1;
-        const renderTarget = new THREE.WebGLRenderTarget(
-          0.5 * this.renderer.domElement.clientWidth,
-          0.5 * this.renderer.domElement.clientHeight
-        );
-        this.occlusionComposer = new EffectComposer(this.renderer, renderTarget);
-        this.occlusionComposer.addPass(new RenderPass(this.scene, this.camera));
-        const volumetricLightParams = getParams(this.data.volumetricLightParams);
-        const volumetricLightPass = new ShaderPass(VolumetericLightShader);
-        volumetricLightPass.uniforms.decay.value = volumetricLightParams.decay;
-        volumetricLightPass.uniforms.density.value = volumetricLightParams.density;
-        volumetricLightPass.uniforms.exposure.value = volumetricLightParams.exposure;
-        volumetricLightPass.uniforms.samples.value = volumetricLightParams.samples;
-        this.occlusionComposer.addPass(volumetricLightPass);
-        this.composer = new EffectComposer(this.renderer);
-        this.composer.addPass(new RenderPass(this.scene, this.camera));
-        const additiveBlendingPass = new ShaderPass(AdditiveBlendingShader);
-        additiveBlendingPass.uniforms.tAdd.value = renderTarget.texture;
-        this.composer.addPass(additiveBlendingPass);
-        additiveBlendingPass.renderToScreen = true;
-        this.camera.layers.set(this.OCCLUSION_LAYER);
-        this.renderer.setClearColor(0);
-        this.occlusionComposer.render();
-        this.camera.layers.set(this.DEFAULT_LAYER);
-        this.renderer.setClearColor(591377);
-      } else if (this.data.effect === "afterimage") {
-        const afterimageParams = getParams(this.data.afterimageParams);
-        const afterimagePass = new AfterimagePass();
-        afterimagePass.uniforms.damp.value = afterimageParams.damp;
-        this.composer.addPass(afterimagePass);
-        const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-        this.composer.addPass(gammaCorrectionPass);
-      } else if (this.data.effect === "bad-tv") {
-        const badTVParams = getParams(this.data.badTVParams);
-        const badTVPass = new ShaderPass(BadTVShader);
-        const rgbShiftPass = new ShaderPass(RGBShiftShader);
-        const filmPass = new ShaderPass(FilmShader);
-        const staticPass = new ShaderPass(StaticShader);
-        const copyPass = new ShaderPass(CopyShader);
-        filmPass.uniforms.grayscale.value = 0;
-        const staticParams = { show: true, amount: 0.5, size: 4 };
-        const rgbShiftParams = { show: true, amount: 0.005, angle: 0 };
-        const filmParams = { show: true, count: 800, sIntensity: 0.9, nIntensity: 0.4 };
-        let time = 0;
-        const animate = () => {
-          time += 0.1;
-          badTVPass.uniforms.time.value = time;
-          filmPass.uniforms.time.value = time;
-          staticPass.uniforms.time.value = time;
-          requestAnimationFrame(animate);
-        };
-        badTVPass.uniforms.distortion.value = badTVParams.distortion;
-        badTVPass.uniforms.distortion2.value = badTVParams.distortion2;
-        badTVPass.uniforms.speed.value = badTVParams.speed;
-        badTVPass.uniforms.rollSpeed.value = badTVParams.rollSpeed;
-        staticPass.uniforms.amount.value = staticParams.amount;
-        staticPass.uniforms.size.value = staticParams.size;
-        rgbShiftPass.uniforms.angle.value = rgbShiftParams.angle * Math.PI;
-        rgbShiftPass.uniforms.amount.value = rgbShiftParams.amount;
-        filmPass.uniforms.sCount.value = filmParams.count;
-        filmPass.uniforms.sIntensity.value = filmParams.sIntensity;
-        filmPass.uniforms.nIntensity.value = filmParams.nIntensity;
-        this.composer.addPass(badTVPass);
-        this.composer.addPass(rgbShiftPass);
-        this.composer.addPass(filmPass);
-        this.composer.addPass(staticPass);
-        this.composer.addPass(copyPass);
-        animate();
-      }
-  
-      this.bind();
-    },
-  
-    bind: function () {
-      const self = this;
-      let isRendering = false;
-  
-      this.renderer.render = function () {
-        if (isRendering) {
-          self.originalRender.apply(this, arguments);
-        } else {
-          isRendering = true;
-          if (self.occlusionComposer) {
-            self.occlusionComposer.render(self.delta);
-          } else if (self.composer) {
-            self.composer.render(self.delta);
-          }
-          isRendering = false;
-        }
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      const additiveBlendingPass = new ShaderPass(AdditiveBlendingShader);
+      additiveBlendingPass.uniforms.tAdd.value = renderTarget.texture;
+      this.composer.addPass(additiveBlendingPass);
+      additiveBlendingPass.renderToScreen = true;
+      this.camera.layers.set(this.OCCLUSION_LAYER);
+      this.renderer.setClearColor(0);
+      this.occlusionComposer.render();
+      this.camera.layers.set(this.DEFAULT_LAYER);
+      this.renderer.setClearColor(591377);
+    } else if (this.data.effect === "afterimage") {
+      const afterimageParams = getParams(this.data.afterimageParams);
+      const afterimagePass = new AfterimagePass();
+      afterimagePass.uniforms.damp.value = afterimageParams.damp;
+      this.composer.addPass(afterimagePass);
+      const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+      this.composer.addPass(gammaCorrectionPass);
+    } else if (this.data.effect === "bad-tv") {
+      const badTVParams = getParams(this.data.badTVParams);
+      const badTVPass = new ShaderPass(BadTVShader);
+      const rgbShiftPass = new ShaderPass(RGBShiftShader);
+      const filmPass = new ShaderPass(FilmShader);
+      const staticPass = new ShaderPass(StaticShader);
+      const copyPass = new ShaderPass(CopyShader);
+      filmPass.uniforms.grayscale.value = 0;
+      const staticParams = { show: true, amount: 0.5, size: 4 };
+      const rgbShiftParams = { show: true, amount: 0.005, angle: 0 };
+      const filmParams = { show: true, count: 800, sIntensity: 0.9, nIntensity: 0.4 };
+      let time = 0;
+      const animate = () => {
+        time += 0.1;
+        badTVPass.uniforms.time.value = time;
+        filmPass.uniforms.time.value = time;
+        staticPass.uniforms.time.value = time;
+        requestAnimationFrame(animate);
       };
-    },
-  });
+      badTVPass.uniforms.distortion.value = badTVParams.distortion;
+      badTVPass.uniforms.distortion2.value = badTVParams.distortion2;
+      badTVPass.uniforms.speed.value = badTVParams.speed;
+      badTVPass.uniforms.rollSpeed.value = badTVParams.rollSpeed;
+      staticPass.uniforms.amount.value = staticParams.amount;
+      staticPass.uniforms.size.value = staticParams.size;
+      rgbShiftPass.uniforms.angle.value = rgbShiftParams.angle * Math.PI;
+      rgbShiftPass.uniforms.amount.value = rgbShiftParams.amount;
+      filmPass.uniforms.sCount.value = filmParams.count;
+      filmPass.uniforms.sIntensity.value = filmParams.sIntensity;
+      filmPass.uniforms.nIntensity.value = filmParams.nIntensity;
+      this.composer.addPass(badTVPass);
+      this.composer.addPass(rgbShiftPass);
+      this.composer.addPass(filmPass);
+      this.composer.addPass(staticPass);
+      this.composer.addPass(copyPass);
+      animate();
+    }
+
+    this.bind();
+  },
+
+  bind: function () {
+    const self = this;
+    let isRendering = false;
+
+    this.renderer.render = function () {
+      if (isRendering) {
+        self.originalRender.apply(this, arguments);
+      } else {
+        isRendering = true;
+        if (self.occlusionComposer) {
+          self.occlusionComposer.render(self.delta);
+        } else if (self.composer) {
+          self.composer.render(self.delta);
+        }
+        isRendering = false;
+      }
+    };
+  },
+
+});
