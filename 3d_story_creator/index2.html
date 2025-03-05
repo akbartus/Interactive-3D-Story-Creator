@@ -1056,31 +1056,20 @@
                 else if (panelId === "tooltip-panel") {
                     cameras[1].setAttribute('camera', 'active', 'true');
                     cameras[0].setAttribute('camera', 'active', 'false');
-                    const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-                    const STARTEVENT = isTouch ? "touchstart" : "mousedown";
-                    const ENDEVENT = isTouch ? "touchend" : "mouseup";
-
-                    window.setTimeout(() => {
-                        new Editor();
-                    }, 100);
-
+                    
+          
 
                     translate.style.display = "block";
                     rotate.style.display = "block";
                     scale.style.display = "block";
                     wasd.style.display = "none";
                     fly.style.display = "none";
+                    
                 }
                 else if (panelId === "3d-panel") {
                     cameras[1].setAttribute('camera', 'active', 'true');
                     cameras[0].setAttribute('camera', 'active', 'false');
-                    const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-                    const STARTEVENT = isTouch ? "touchstart" : "mousedown";
-                    const ENDEVENT = isTouch ? "touchend" : "mouseup";
-
-                    window.setTimeout(() => {
-                        new Editor();
-                    }, 100);
+   
 
 
                     translate.style.display = "block";
@@ -1096,6 +1085,9 @@
         let splatEntityId = 0;
 
         document.addEventListener('DOMContentLoaded', function () {
+            // window.setTimeout(() => {
+            //         new Editor();
+            //     }, 100);
             // Create the model container entity dynamically
 
             // Get reference to the file input
@@ -1293,9 +1285,7 @@
 
                 // Log the URL for debugging
                 console.log('Loading .splat file:', url);
-                const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-                const STARTEVENT = isTouch ? "touchstart" : "mousedown";
-                const ENDEVENT = isTouch ? "touchend" : "mouseup";
+                
 
                 window.setTimeout(() => {
                     new Editor();
@@ -1315,9 +1305,7 @@
 
                 // Log the URL for debugging
                 console.log('Loading .gltf file:', url);
-                const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-                const STARTEVENT = isTouch ? "touchstart" : "mousedown";
-                const ENDEVENT = isTouch ? "touchend" : "mouseup";
+                
 
                 window.setTimeout(() => {
                     new Editor();
@@ -1326,7 +1314,26 @@
         });
        
    
-
+// Register the custom a-grid primitive
+AFRAME.registerPrimitive("a-grid", {
+  defaultComponents: {
+    geometry: {
+      primitive: "plane",
+      width: 75,
+      height: 75,
+    },
+    rotation: { x: -90, y: 0, z: 0 },
+    material: {
+      src: "url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)",
+      repeat: "75 75",
+    },
+  },
+  mappings: {
+    width: "geometry.width",
+    height: "geometry.height",
+    src: "material.src",
+  },
+});
     </script>
 </head>
 
@@ -1534,7 +1541,7 @@
     <a-scene xr-mode-ui="enabled: false" post-processing="effect: none">
         <!-- <a-box id="cutout-box" visible="false" scale="10 10 10" position="0.8145 1.73322 -2.35981"></a-box> -->
         <a-entity camera-movement-recorder camera-movement-animator scroll-animator wasd-controls="acceleration:10"
-            look-controls camera tooltip-component position="5.132 1.6 7.237"></a-entity>
+            look-controls tooltip-component position="5.132 1.6 7.237"></a-entity>
         <a-grid position="0 -0.1 0"></a-grid>
 
     </a-scene>

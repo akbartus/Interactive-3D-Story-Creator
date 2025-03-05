@@ -16,26 +16,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// Register the custom a-grid primitive
-AFRAME.registerPrimitive("a-grid", {
-  defaultComponents: {
-    geometry: {
-      primitive: "plane",
-      width: 75,
-      height: 75,
-    },
-    rotation: { x: -90, y: 0, z: 0 },
-    material: {
-      src: "url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)",
-      repeat: "75 75",
-    },
-  },
-  mappings: {
-    width: "geometry.width",
-    height: "geometry.height",
-    src: "material.src",
-  },
-});
+
 
 /////////////////////////////
 // Transform Controls ///////
@@ -334,9 +315,9 @@ class Editor {
     this.cameraEl = document.createElement("a-entity");
     this.cameraEl.classList.add("myCam");
     this.cameraEl.setAttribute("camera", {
-      far: 1000,
+      far: 10000,
       fov: 75,
-      near: 0.01,
+      near: 0.05,
       active: true,
     });
 
@@ -2863,7 +2844,3 @@ const STARTEVENT = (() => {
 const ENDEVENT = (() => {
   return isTouch ? "touchend" : "mouseup";
 })();
-
-window.setTimeout(() => {
-  new Editor();
-}, 100);
