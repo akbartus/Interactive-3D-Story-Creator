@@ -81,7 +81,8 @@
             background-color: #0056b3;
         }
 
-        #preloadGS, #preloadGLTF{
+        #preloadGS,
+        #preloadGLTF {
             margin-top: 10px;
         }
 
@@ -1012,86 +1013,86 @@
 
 
         function togglePanel(panelId) {
-    const translate = document.getElementById('translateIcon');
-    const rotate = document.getElementById('rotateIcon');
-    const scale = document.getElementById('scaleIcon');
-    const wasd = document.getElementById('wasd');
-    const fly = document.getElementById('fly');
-    const panels = document.querySelectorAll('.panel');
+            const translate = document.getElementById('translateIcon');
+            const rotate = document.getElementById('rotateIcon');
+            const scale = document.getElementById('scaleIcon');
+            const wasd = document.getElementById('wasd');
+            const fly = document.getElementById('fly');
+            const panels = document.querySelectorAll('.panel');
 
-    panels.forEach(panel => {
-        panel.style.display = panel.id === panelId ?
-            (panel.style.display === 'block' ? 'none' : 'block') :
-            'none';
-    });
+            panels.forEach(panel => {
+                panel.style.display = panel.id === panelId ?
+                    (panel.style.display === 'block' ? 'none' : 'block') :
+                    'none';
+            });
 
-    const cameras = document.querySelectorAll('[camera]');
+            const cameras = document.querySelectorAll('[camera]');
 
-    // Ensure there are at least two cameras before toggling
-    if (cameras.length >= 2) {
-        let isActive = cameras[1].getAttribute('camera').active === 'true';
+            // Ensure there are at least two cameras before toggling
+            if (cameras.length >= 2) {
+                let isActive = cameras[1].getAttribute('camera').active === 'true';
 
-        // Toggle camera based on panel type
-        if (panelId === "camera-panel") {
-            cameras[1].setAttribute('camera', 'active', 'false');
-            cameras[0].setAttribute('camera', 'active', 'true');
+                // Toggle camera based on panel type
+                if (panelId === "camera-panel") {
+                    cameras[1].setAttribute('camera', 'active', 'false');
+                    cameras[0].setAttribute('camera', 'active', 'true');
 
-            translate.style.display = "none";
-            rotate.style.display = "none";
-            scale.style.display = "none";
-            wasd.style.display = "block";
-            fly.style.display = "block";
+                    translate.style.display = "none";
+                    rotate.style.display = "none";
+                    scale.style.display = "none";
+                    wasd.style.display = "block";
+                    fly.style.display = "block";
+                }
+                else if (panelId === "scroll-panel") {
+                    cameras[1].setAttribute('camera', 'active', 'false');
+                    cameras[0].setAttribute('camera', 'active', 'true');
+
+                    translate.style.display = "none";
+                    rotate.style.display = "none";
+                    scale.style.display = "none";
+                    wasd.style.display = "block";
+                    fly.style.display = "block";
+                }
+                else if (panelId === "effects-panel") {
+                    cameras[1].setAttribute('camera', 'active', 'false');
+                    cameras[0].setAttribute('camera', 'active', 'true');
+
+                    translate.style.display = "none";
+                    rotate.style.display = "none";
+                    scale.style.display = "none";
+                    wasd.style.display = "block";
+                    fly.style.display = "block";
+                }
+                else if (panelId === "tooltip-panel") {
+                    cameras[1].setAttribute('camera', 'active', 'true');
+                    cameras[0].setAttribute('camera', 'active', 'false');
+
+                    translate.style.display = "block";
+                    rotate.style.display = "block";
+                    scale.style.display = "block";
+                    wasd.style.display = "none";
+                    fly.style.display = "none";
+
+                    // Disable post-processing effect when switching to tooltip-panel
+                    const scene = document.querySelector('a-scene');
+                    scene.setAttribute('post-processing', 'effect', 'none');
+                }
+                else if (panelId === "3d-panel") {
+                    cameras[1].setAttribute('camera', 'active', 'true');
+                    cameras[0].setAttribute('camera', 'active', 'false');
+
+                    translate.style.display = "block";
+                    rotate.style.display = "block";
+                    scale.style.display = "block";
+                    wasd.style.display = "none";
+                    fly.style.display = "none";
+
+                    window.setTimeout(() => {
+                        new Editor();
+                    }, 100);
+                }
+            }
         }
-        else if (panelId === "scroll-panel") {
-            cameras[1].setAttribute('camera', 'active', 'false');
-            cameras[0].setAttribute('camera', 'active', 'true');
-
-            translate.style.display = "none";
-            rotate.style.display = "none";
-            scale.style.display = "none";
-            wasd.style.display = "block";
-            fly.style.display = "block";
-        }
-        else if (panelId === "effects-panel") {
-            cameras[1].setAttribute('camera', 'active', 'false');
-            cameras[0].setAttribute('camera', 'active', 'true');
-
-            translate.style.display = "none";
-            rotate.style.display = "none";
-            scale.style.display = "none";
-            wasd.style.display = "block";
-            fly.style.display = "block";
-        }
-        else if (panelId === "tooltip-panel") {
-            cameras[1].setAttribute('camera', 'active', 'true');
-            cameras[0].setAttribute('camera', 'active', 'false');
-
-            translate.style.display = "block";
-            rotate.style.display = "block";
-            scale.style.display = "block";
-            wasd.style.display = "none";
-            fly.style.display = "none";
-
-            // Disable post-processing effect when switching to tooltip-panel
-            const scene = document.querySelector('a-scene');
-            scene.setAttribute('post-processing', 'effect', 'none');
-        }
-        else if (panelId === "3d-panel") {
-            cameras[1].setAttribute('camera', 'active', 'true');
-            cameras[0].setAttribute('camera', 'active', 'false');
-
-            translate.style.display = "block";
-            rotate.style.display = "block";
-            scale.style.display = "block";
-            wasd.style.display = "none";
-            fly.style.display = "none";
-
-            window.setTimeout(() => {
-                new Editor();
-            }, 100);
-        }
-    }
-}
 
 
         let splatEntityId = 0;
@@ -1184,7 +1185,7 @@
                         }
 
                         // Interaction handling
-                      
+
                         window.setTimeout(() => {
                             new Editor();
                         }, 100);
@@ -1294,7 +1295,8 @@
 
                 // Log the URL for debugging
                 console.log('Loading .splat file:', url);
-                
+
+
 
                 window.setTimeout(() => {
                     new Editor();
@@ -1314,35 +1316,79 @@
 
                 // Log the URL for debugging
                 console.log('Loading .gltf file:', url);
-                
-                
+
+
                 window.setTimeout(() => {
                     new Editor();
                 }, 100);
             });
         });
-       
-   
-// Register the custom a-grid primitive
-AFRAME.registerPrimitive("a-grid", {
-  defaultComponents: {
-    geometry: {
-      primitive: "plane",
-      width: 75,
-      height: 75,
-    },
-    rotation: { x: -90, y: 0, z: 0 },
-    material: {
-      src: "url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)",
-      repeat: "75 75",
-    },
-  },
-  mappings: {
-    width: "geometry.width",
-    height: "geometry.height",
-    src: "material.src",
-  },
-});
+
+
+        // Register the custom a-grid primitive
+        AFRAME.registerPrimitive("a-grid", {
+            defaultComponents: {
+                geometry: {
+                    primitive: "plane",
+                    width: 75,
+                    height: 75,
+                },
+                rotation: { x: -90, y: 0, z: 0 },
+                material: {
+                    src: "url(https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v1.16.3/assets/grid.png)",
+                    repeat: "75 75",
+                },
+            },
+            mappings: {
+                width: "geometry.width",
+                height: "geometry.height",
+                src: "material.src",
+            },
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const colorEffectDropdown = document.getElementById('colorEffect');
+            const singleColorPicker = document.getElementById('singleColor');
+            const displayRadiusSlider = document.getElementById('displayRadius');
+            const displayRadiusValue = document.getElementById('displayRadiusValue');
+
+            if (colorEffectDropdown && singleColorPicker && displayRadiusSlider && displayRadiusValue) {
+                colorEffectDropdown.addEventListener('change', function () {
+                    const effect = parseInt(this.value, 10);
+                    const splatEntity = document.querySelector('[gaussian-splatting]');
+                    if (splatEntity) {
+                        console.log('Setting color effect:', effect);
+                        splatEntity.components['gaussian-splatting'].setColorEffect(effect);
+                        splatEntity.sceneEl.renderer.render(splatEntity.sceneEl.object3D, splatEntity.sceneEl.camera);
+                    }
+                });
+
+                singleColorPicker.addEventListener('change', function () {
+                    const color = this.value;
+                    const splatEntity = document.querySelector('[gaussian-splatting]');
+                    if (splatEntity) {
+                        console.log('Setting single color:', color);
+                        splatEntity.components['gaussian-splatting'].setSingleColor(color);
+                        splatEntity.sceneEl.renderer.render(splatEntity.sceneEl.object3D, splatEntity.sceneEl.camera);
+                    }
+                });
+
+                displayRadiusSlider.addEventListener('input', function () {
+                    const radius = parseFloat(this.value);
+                    displayRadiusValue.textContent = radius.toFixed(1);
+                    const splatEntity = document.querySelector('[gaussian-splatting]');
+                    if (splatEntity) {
+                        console.log('Setting display radius:', radius);
+                        splatEntity.components['gaussian-splatting'].setDisplayRadius({ x: radius, y: radius, z: radius });
+                        splatEntity.sceneEl.renderer.render(splatEntity.sceneEl.object3D, splatEntity.sceneEl.camera);
+                    }
+                });
+            } else {
+                console.error('One or more elements not found in the DOM.');
+            }
+        });
     </script>
 </head>
 
@@ -1492,8 +1538,8 @@ AFRAME.registerPrimitive("a-grid", {
         <label>Load generated JSON file: </label>
         <input type="file" id="fileInput2" accept="application/json">
         <br>
-        
-        
+
+
 
         <!-- Display current frame, total frames, and duration -->
         <div>
@@ -1545,9 +1591,27 @@ AFRAME.registerPrimitive("a-grid", {
             <option value="bad-tv">Bad TV</option>
             <option value="custom-outline">Custom Outline</option>
             <option value="moebius">Moebius</option>
-          </select>
-          
-          <div id="effect-params"></div>
+        </select>
+
+        <div id="effect-params"></div>
+
+        <h2>Gaussian Splat Effect</h2>
+        <!-- Dropdown for Color Effect -->
+        <label for="colorEffect">Color Effect:</label>
+        <select id="colorEffect">
+            <option value="0">Normal</option>
+            <option value="1">Grayscale</option>
+            <option value="2">Single Color + White</option>
+        </select>
+
+        <!-- Color Picker for Single Color -->
+        <label for="singleColor">Single Color:</label>
+        <input type="color" id="singleColor" value="#FF0000">
+
+        <!-- Range Input for Display Radius -->
+        <label for="displayRadius">Display Radius:</label>
+        <input type="range" id="displayRadius" min="0.1" max="10.0" step="0.1" value="1.0">
+        <span id="displayRadiusValue">1.0</span>
     </div>
 
     <!-- Scroll panel -->
@@ -1560,7 +1624,7 @@ AFRAME.registerPrimitive("a-grid", {
     <a-scene xr-mode-ui="enabled: false" post-processing="effect: none">
         <!-- <a-box id="cutout-box" visible="false" scale="10 10 10" position="0.8145 1.73322 -2.35981"></a-box> -->
         <a-entity camera-movement-recorder camera-movement-animator scroll-animator wasd-controls="acceleration:10"
-            look-controls camera tooltip-component position="5.132 1.6 7.237" ></a-entity>
+            look-controls camera tooltip-component position="5.132 1.6 7.237"></a-entity>
         <a-grid position="0 -0.1 0"></a-grid>
 
     </a-scene>

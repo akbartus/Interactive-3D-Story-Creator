@@ -6,6 +6,9 @@ AFRAME.registerComponent("gaussian-splatting", {
     xrPixelRatio: { type: "number", default: 0.5 },
     depthWrite: { type: "boolean", default: false },
     discardFilter: { type: "number", default: 0.0 },
+    colorEffect: { type: "number", default: 0 }, // 0 = normal, 1 = grayscale, 2 = single color
+    singleColor: { type: "color", default: "blue" }, // Default to red
+    displayRadius: { type: "vec3", default: { x: 10.0, y: 10.0, z: 10.0 } }, // Accepts x, y, z value
   },
   init: function () {
     // aframe-specific data
@@ -32,6 +35,15 @@ AFRAME.registerComponent("gaussian-splatting", {
   },
   update: function (oldData) {
     // Check if the src attribute has changed
+    if (oldData.colorEffect !== this.data.colorEffect) {
+      this.setColorEffect(this.data.colorEffect);
+    }
+    if (oldData.singleColor !== this.data.singleColor) {
+      this.setSingleColor(this.data.singleColor);
+    }
+    if (oldData.displayRadius !== this.data.displayRadius) {
+      this.setDisplayRadius(this.data.displayRadius);
+    }
     if (oldData.src !== this.data.src) {
       this.loadData(
         this.el.sceneEl.camera.el.components.camera.camera,
@@ -50,7 +62,6 @@ AFRAME.registerComponent("gaussian-splatting", {
       }
     }
   },
-  // also works from vanilla three.js
   initGL: async function (numVertexes) {
     console.log("initGL", numVertexes);
     this.object.frustumCulled = false;
@@ -117,6 +128,9 @@ AFRAME.registerComponent("gaussian-splatting", {
     geometry.setAttribute("splatIndex", splatIndexes);
     geometry.instanceCount = 1;
 
+    // Convert the singleColor hex string to a THREE.Color object
+    const singleColor = new THREE.Color(this.data.singleColor);
+
     const material = new THREE.ShaderMaterial({
       uniforms: {
         viewport: { value: new Float32Array([1980, 1080]) }, // Dummy. will be overwritten
@@ -126,112 +140,145 @@ AFRAME.registerComponent("gaussian-splatting", {
         gsProjectionMatrix: { value: this.getProjectionMatrix() },
         gsModelViewMatrix: { value: this.getModelViewMatrix() },
         discardFilter: { value: this.data.discardFilter },
+        colorEffect: { value: this.data.colorEffect },
+        singleColor: { value: new THREE.Color(this.data.singleColor) },
+        displayRadius: {
+          value: new THREE.Vector3().copy(this.data.displayRadius),
+        },
       },
       vertexShader: `
-				precision highp sampler2D;
-				precision highp usampler2D;
-
-				out vec4 vColor;
-				out vec2 vPosition;
-				out float fDF;
-				uniform vec2 viewport;
-				uniform float focal;
-				uniform mat4 gsProjectionMatrix;
-				uniform mat4 gsModelViewMatrix;
-				uniform float discardFilter;
-
-				attribute uint splatIndex;
-				uniform sampler2D centerAndScaleTexture;
-				uniform usampler2D covAndColorTexture;
-
-				vec2 unpackInt16(in uint value) {
-					int v = int(value);
-					int v0 = v >> 16;
-					int v1 = (v & 0xFFFF);
-					if((v & 0x8000) != 0)
-						v1 |= 0xFFFF0000;
-					return vec2(float(v1), float(v0));
-				}
-
-				void main () {
-					ivec2 texSize = textureSize(centerAndScaleTexture, 0);
-					ivec2 texPos = ivec2(splatIndex%uint(texSize.x), splatIndex/uint(texSize.x));
-					vec4 centerAndScaleData = texelFetch(centerAndScaleTexture, texPos, 0);
-
-					vec4 center = vec4(centerAndScaleData.xyz, 1);
-					vec4 camspace = gsModelViewMatrix * center;
-					vec4 pos2d = gsProjectionMatrix * camspace;
-
-					float bounds = 1.2 * pos2d.w;
-					if (pos2d.z < -pos2d.w || pos2d.x < -bounds || pos2d.x > bounds
-						|| pos2d.y < -bounds || pos2d.y > bounds) {
-						gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-						return;
-					}
-
-					uvec4 covAndColorData = texelFetch(covAndColorTexture, texPos, 0);
-					vec2 cov3D_M11_M12 = unpackInt16(covAndColorData.x) * centerAndScaleData.w;
-					vec2 cov3D_M13_M22 = unpackInt16(covAndColorData.y) * centerAndScaleData.w;
-					vec2 cov3D_M23_M33 = unpackInt16(covAndColorData.z) * centerAndScaleData.w;
-					mat3 Vrk = mat3(
-						cov3D_M11_M12.x, cov3D_M11_M12.y, cov3D_M13_M22.x,
-						cov3D_M11_M12.y, cov3D_M13_M22.y, cov3D_M23_M33.x,
-						cov3D_M13_M22.x, cov3D_M23_M33.x, cov3D_M23_M33.y
-					);
-
-					mat3 J = mat3(
-						focal / camspace.z, 0., -(focal * camspace.x) / (camspace.z * camspace.z), 
-						0., -focal / camspace.z, (focal * camspace.y) / (camspace.z * camspace.z), 
-						0., 0., 0.
-					);
-
-					mat3 W = transpose(mat3(gsModelViewMatrix));
-					mat3 T = W * J;
-					mat3 cov = transpose(T) * Vrk * T;
-
-					vec2 vCenter = vec2(pos2d) / pos2d.w;
-
-					float diagonal1 = cov[0][0] + 0.3;
-					float offDiagonal = cov[0][1];
-					float diagonal2 = cov[1][1] + 0.3;
-
-					float mid = 0.5 * (diagonal1 + diagonal2);
-					float radius = length(vec2((diagonal1 - diagonal2) / 2.0, offDiagonal));
-					float lambda1 = mid + radius;
-					float lambda2 = max(mid - radius, 0.1);
-					vec2 diagonalVector = normalize(vec2(offDiagonal, lambda1 - diagonal1));
-					vec2 v1 = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
-					vec2 v2 = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
-
-					uint colorUint = covAndColorData.w;
-					vColor = vec4(
-						float(colorUint & uint(0xFF)) / 255.0,
-						float((colorUint >> uint(8)) & uint(0xFF)) / 255.0,
-						float((colorUint >> uint(16)) & uint(0xFF)) / 255.0,
-						float(colorUint >> uint(24)) / 255.0
-					);
-					vPosition = position.xy;
-					fDF = discardFilter;
-
-					gl_Position = vec4(
-						vCenter 
-							+ position.x * v2 / viewport * 2.0 
-							+ position.y * v1 / viewport * 2.0, pos2d.z / pos2d.w, 1.0);
-				}
-				`,
+        precision highp sampler2D;
+        precision highp usampler2D;
+  
+        out vec4 vColor;
+        out vec2 vPosition;
+        out float fDF;
+        uniform vec2 viewport;
+        uniform float focal;
+        uniform mat4 gsProjectionMatrix;
+        uniform mat4 gsModelViewMatrix;
+        uniform float discardFilter;
+        uniform vec3 displayRadius;
+  
+        attribute uint splatIndex;
+        uniform sampler2D centerAndScaleTexture;
+        uniform usampler2D covAndColorTexture;
+  
+        vec2 unpackInt16(in uint value) {
+          int v = int(value);
+          int v0 = v >> 16;
+          int v1 = (v & 0xFFFF);
+          if((v & 0x8000) != 0)
+            v1 |= 0xFFFF0000;
+          return vec2(float(v1), float(v0));
+        }
+  
+        void main () {
+          ivec2 texSize = textureSize(centerAndScaleTexture, 0);
+          ivec2 texPos = ivec2(splatIndex%uint(texSize.x), splatIndex/uint(texSize.x));
+          vec4 centerAndScaleData = texelFetch(centerAndScaleTexture, texPos, 0);
+  
+          vec4 center = vec4(centerAndScaleData.xyz, 1);
+          vec4 camspace = gsModelViewMatrix * center;
+          vec4 pos2d = gsProjectionMatrix * camspace;
+  
+          // Calculate distance from origin in each axis
+          vec3 distanceFromOrigin = abs(center.xyz) / displayRadius;
+  
+          // Discard if outside the display radius in any axis
+          if (distanceFromOrigin.x > 1.0 || distanceFromOrigin.y > 1.0 || distanceFromOrigin.z > 1.0) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            return;
+          }
+  
+          float bounds = 1.2 * pos2d.w;
+          if (pos2d.z < -pos2d.w || pos2d.x < -bounds || pos2d.x > bounds
+            || pos2d.y < -bounds || pos2d.y > bounds) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            return;
+          }
+  
+          uvec4 covAndColorData = texelFetch(covAndColorTexture, texPos, 0);
+          vec2 cov3D_M11_M12 = unpackInt16(covAndColorData.x) * centerAndScaleData.w;
+          vec2 cov3D_M13_M22 = unpackInt16(covAndColorData.y) * centerAndScaleData.w;
+          vec2 cov3D_M23_M33 = unpackInt16(covAndColorData.z) * centerAndScaleData.w;
+          mat3 Vrk = mat3(
+            cov3D_M11_M12.x, cov3D_M11_M12.y, cov3D_M13_M22.x,
+            cov3D_M11_M12.y, cov3D_M13_M22.y, cov3D_M23_M33.x,
+            cov3D_M13_M22.x, cov3D_M23_M33.x, cov3D_M23_M33.y
+          );
+  
+          mat3 J = mat3(
+            focal / camspace.z, 0., -(focal * camspace.x) / (camspace.z * camspace.z), 
+            0., -focal / camspace.z, (focal * camspace.y) / (camspace.z * camspace.z), 
+            0., 0., 0.
+          );
+  
+          mat3 W = transpose(mat3(gsModelViewMatrix));
+          mat3 T = W * J;
+          mat3 cov = transpose(T) * Vrk * T;
+  
+          vec2 vCenter = vec2(pos2d) / pos2d.w;
+  
+          float diagonal1 = cov[0][0] + 0.3;
+          float offDiagonal = cov[0][1];
+          float diagonal2 = cov[1][1] + 0.3;
+  
+          float mid = 0.5 * (diagonal1 + diagonal2);
+          float radius = length(vec2((diagonal1 - diagonal2) / 2.0, offDiagonal));
+          float lambda1 = mid + radius;
+          float lambda2 = max(mid - radius, 0.1);
+          vec2 diagonalVector = normalize(vec2(offDiagonal, lambda1 - diagonal1));
+          vec2 v1 = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
+          vec2 v2 = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
+  
+          uint colorUint = covAndColorData.w;
+          vColor = vec4(
+            float(colorUint & uint(0xFF)) / 255.0,
+            float((colorUint >> uint(8)) & uint(0xFF)) / 255.0,
+            float((colorUint >> uint(16)) & uint(0xFF)) / 255.0,
+            float(colorUint >> uint(24)) / 255.0
+          );
+          vPosition = position.xy;
+          fDF = discardFilter;
+  
+          gl_Position = vec4(
+            vCenter 
+              + position.x * v2 / viewport * 2.0 
+              + position.y * v1 / viewport * 2.0, pos2d.z / pos2d.w, 1.0);
+        }
+      `,
       fragmentShader: `
-				in vec4 vColor;
-				in vec2 vPosition;
-				in float fDF;
+      uniform int colorEffect;
+uniform vec3 singleColor;
 
-				void main () {
-					float A = -dot(vPosition, vPosition);
-					if (A < -4.0) discard;
-					float B = exp(A) * vColor.a;
-					if(B < fDF) discard;
-					gl_FragColor = vec4(vColor.rgb, B);
-				}
-			`,
+in vec4 vColor;
+in vec2 vPosition;
+in float fDF;
+
+void main () {
+  float A = -dot(vPosition, vPosition);
+  if (A < -4.0) discard;
+  float B = exp(A) * vColor.a;
+  if(B < fDF) discard;
+
+  vec3 finalColor = vColor.rgb;
+
+  if (colorEffect == 1) {
+    // Grayscale effect
+    float gray = dot(finalColor, vec3(0.299, 0.587, 0.114));
+    finalColor = vec3(gray);
+  } else if (colorEffect == 2) {
+    // Single color + white effect
+    // Blend the original color with white using a 50% mix
+    finalColor = mix(finalColor, vec3(1.0), 0.5); // 50% white, 50% original color
+    // Apply the single color as a tint
+    finalColor *= singleColor;
+  }
+
+  gl_FragColor = vec4(finalColor, B);
+}
+      `,
       blending: THREE.CustomBlending,
       blendSrcAlpha: THREE.OneFactor,
       depthTest: true,
@@ -261,6 +308,7 @@ AFRAME.registerComponent("gaussian-splatting", {
     };
 
     const mesh = new THREE.Mesh(geometry, material);
+    this.mesh = mesh;
     mesh.frustumCulled = false;
     this.object.add(mesh);
 
@@ -355,64 +403,6 @@ AFRAME.registerComponent("gaussian-splatting", {
           const mbps =
             bytesDownloaded / 1024 / 1024 / ((Date.now() - start) / 1000);
           const percent = (bytesDownloaded / totalDownloadBytes) * 100;
-
-		  // // Overlay logic
-		  // let overlay = document.createElement("div");
-      //     overlay.style.position = "fixed";
-      //     overlay.style.top = "0";
-      //     overlay.style.left = "0";
-      //     overlay.style.width = "100%";
-      //     overlay.style.height = "100%";
-      //     overlay.style.backgroundColor = "rgba(0, 0, 0, 0.9)";
-      //     overlay.style.zIndex = "9999";
-      //     overlay.style.display = "flex";
-      //     overlay.style.justifyContent = "center";
-      //     overlay.style.alignItems = "center";
-      //     overlay.style.color = "white";
-      //     overlay.style.fontSize = "18px";
-      //     overlay.style.fontFamily = "Arial, sans-serif";
-      //     document.body.appendChild(overlay);
-
-      //     let progressText = document.createElement("span");
-      //     progressText.innerHTML = "Loading 0%";
-      //     progressText.style.textAlign = "center"
-			// overlay.appendChild(progressText);
-
-      //     let lastReportedProgress = 0;
-
-      //     // Simulate a download progress function
-      //     function simulateDownloadProgress() {
-      //       let percent = 0;
-
-      //       // Interval to simulate download progress
-      //       let downloadInterval = setInterval(() => {
-      //         percent += Math.random() * 5; // Simulating progress increment (random value)
-
-      //         // Clamp the percentage value to 100%
-      //         if (percent > 100) {
-      //           percent = 100;
-      //         }
-
-      //         // Check progress
-      //         if (percent - lastReportedProgress > 1) {
-			// 	  progressText.innerHTML = `Interactive 3D Story Creator<br>Loading ${percent.toFixed(2)}%`;
-
-      //           lastReportedProgress = percent;
-      //         }
-
-      //         // If download is complete, hide overlay
-      //         if (percent >= 100) {
-      //           clearInterval(downloadInterval);
-      //           setTimeout(() => {
-      //             overlay.style.display = "none"; // Hide overlay
-      //             console.log("Download complete");
-      //           }, 1000); // Delay before hiding
-      //         }
-      //       }, 100); // Update every 100 ms
-      //     }
-
-      //     // Start simulating download progress
-      //     simulateDownloadProgress();
         }
         chunks.push(value);
 
@@ -1012,5 +1002,30 @@ AFRAME.registerComponent("gaussian-splatting", {
     console.timeEnd("build buffer");
     return buffer;
   },
-  
+  setColorEffect: function (effect) {
+    this.data.colorEffect = effect;
+    if (this.mesh && this.mesh.material) {
+      this.mesh.material.uniforms.colorEffect.value = effect;
+      this.mesh.material.uniformsNeedUpdate = true;
+    }
+  },
+  setSingleColor: function (color) {
+    this.data.singleColor = color;
+    if (this.mesh && this.mesh.material) {
+      const singleColor = new THREE.Color(color);
+      this.mesh.material.uniforms.singleColor.value.set(
+        singleColor.r,
+        singleColor.g,
+        singleColor.b
+      );
+      this.mesh.material.uniformsNeedUpdate = true;
+    }
+  },
+  setDisplayRadius: function (radius) {
+    this.data.displayRadius = radius;
+    if (this.mesh && this.mesh.material) {
+      this.mesh.material.uniforms.displayRadius.value.copy(radius);
+      this.mesh.material.uniformsNeedUpdate = true;
+    }
+  },
 });
