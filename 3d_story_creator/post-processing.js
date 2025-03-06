@@ -371,6 +371,7 @@ class PencilLinesPass extends Pass {
           this.fsQuad.render(e));
   }
 }
+
 const HalftoneShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -940,8 +941,7 @@ const OutputShader = {
     uniforms: { tDiffuse: { value: null }, toneMappingExposure: { value: 1 } },
     vertexShader:
       "\n    \n            varying vec2 vUv;\n    \n            void main() {\n    \n                vUv = uv;\n                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );\n    \n            }",
-    fragmentShader:
-      `uniform sampler2D tDiffuse;
+    fragmentShader: `uniform sampler2D tDiffuse;
 
 #include <tonemapping_pars_fragment>
 
@@ -967,7 +967,8 @@ void main() {
 
     // color space
     gl_FragColor.rgb = LinearTosRGB(gl_FragColor.rgb);
-}`},
+}`,
+  },
   NoToneMapping = THREE.NoToneMapping,
   LinearToneMapping = THREE.LinearToneMapping,
   ReinhardToneMapping = THREE.ReinhardToneMapping,
@@ -1339,284 +1340,947 @@ const BadTVShader = {
     ].join("\n"),
   };
 
-  function getParams(str) {
-    const params = {};
-    const cleanedStr = str.replace(/\s/g, ""); // Remove all whitespace
-    const properties = cleanedStr.split(","); // Split by commas
-  
-    for (let i = 0; i < properties.length; i++) {
-      const [key, value] = properties[i].split(":"); // Split each property into key and value
-      params[key] = eval(value); // Evaluate the value (e.g., convert "1" to 1, "Math.PI" to 3.14159, etc.)
-    }
-  
-    return params;
+class CustomOutlinePass extends Pass {
+  constructor(resolution, scene, camera) {
+    super();
+
+    this.renderScene = scene;
+    this.renderCamera = camera;
+    this.resolution = new THREE.Vector2(resolution.x, resolution.y);
+
+    this.fsQuad = new FullScreenQuad(null);
+    this.fsQuad.material = this.createOutlinePostProcessMaterial();
+
+    // Create a buffer to store the normals of the scene onto
+    const normalTarget = new THREE.WebGLRenderTarget(
+      this.resolution.x,
+      this.resolution.y
+    );
+    normalTarget.texture.format = THREE.RGBFormat;
+    normalTarget.texture.minFilter = THREE.NearestFilter;
+    normalTarget.texture.magFilter = THREE.NearestFilter;
+    normalTarget.texture.generateMipmaps = false;
+    normalTarget.stencilBuffer = false;
+    this.normalTarget = normalTarget;
+
+    this.normalOverrideMaterial = new THREE.MeshNormalMaterial();
   }
+
+  dispose() {
+    this.normalTarget.dispose();
+    this.fsQuad.dispose();
+  }
+
+  setSize(width, height) {
+    this.normalTarget.setSize(width, height);
+    this.resolution.set(width, height);
+
+    this.fsQuad.material.uniforms.screenSize.value.set(
+      this.resolution.x,
+      this.resolution.y,
+      1 / this.resolution.x,
+      1 / this.resolution.y
+    );
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    // Turn off writing to the depth buffer
+    // because we need to read from it in the subsequent passes.
+    const depthBufferValue = writeBuffer.depthBuffer;
+    writeBuffer.depthBuffer = false;
+
+    // 1. Re-render the scene to capture all normals in texture.
+    // Ideally we could capture this in the first render pass along with
+    // the depth texture.
+    renderer.setRenderTarget(this.normalTarget);
+
+    const overrideMaterialValue = this.renderScene.overrideMaterial;
+    this.renderScene.overrideMaterial = this.normalOverrideMaterial;
+    renderer.render(this.renderScene, this.renderCamera);
+    this.renderScene.overrideMaterial = overrideMaterialValue;
+
+    this.fsQuad.material.uniforms["depthBuffer"].value =
+      readBuffer.depthTexture;
+    this.fsQuad.material.uniforms["normalBuffer"].value =
+      this.normalTarget.texture;
+    this.fsQuad.material.uniforms["sceneColorBuffer"].value =
+      readBuffer.texture;
+
+    // 2. Draw the outlines using the depth texture and normal texture
+    // and combine it with the scene color
+    if (this.renderToScreen) {
+      // If this is the last effect, then renderToScreen is true.
+      // So we should render to the screen by setting target null
+      // Otherwise, just render into the writeBuffer that the next effect will use as its read buffer.
+      renderer.setRenderTarget(null);
+      this.fsQuad.render(renderer);
+    } else {
+      renderer.setRenderTarget(writeBuffer);
+      this.fsQuad.render(renderer);
+    }
+
+    // Reset the depthBuffer value so we continue writing to it in the next render.
+    writeBuffer.depthBuffer = depthBufferValue;
+  }
+
+  get vertexShader() {
+    return `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+        `;
+  }
+  get fragmentShader() {
+    return `
+        #include <packing>
+        // The above include imports "perspectiveDepthToViewZ"
+        // and other GLSL functions from ThreeJS we need for reading depth.
+        uniform sampler2D sceneColorBuffer;
+        uniform sampler2D depthBuffer;
+        uniform sampler2D normalBuffer;
+        uniform float cameraNear;
+        uniform float cameraFar;
+        uniform vec4 screenSize;
+        uniform vec3 outlineColor;
+        uniform vec4 multiplierParameters;
+        uniform int debugVisualize;
   
-  // AFRAME.registerComponent("post-processing", {
-  //   schema: {
-  //     effect: { type: "string", default: "none" },
-  //     halftoneParams: {
-  //       type: "string",
-  //       default:
-  //         "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false",
-  //     },
-  //     oldFilmParams: {
-  //       type: "string",
-  //       default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256",
-  //     },
-  //     pixelParams: {
-  //       type: "string",
-  //       default:
-  //         "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4",
-  //     },
-  //     glitchParams: { type: "string", default: "goWild: false, enabled: true" },
-  //     sobelParams: { type: "string", default: "enabled: true" },
-  //     bloomParams: {
-  //       type: "string",
-  //       default: "threshold: 0, strength: 0.4, radius: 0, exposure: 1",
-  //     },
-  //     dotScreenParams: { type: "string", default: "scale: 4, angle: 90" },
-  //     volumetricLightParams: {
-  //       type: "string",
-  //       default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50",
-  //     },
-  //     afterimageParams: { type: "string", default: "damp: 0.8" },
-  //     badTVParams: {
-  //       type: "string",
-  //       default:
-  //         "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0",
-  //     },
-  //   },
+        varying vec2 vUv;
   
-  //   init: function () {
-  //     // Ensure the renderer is properly assigned
-  //     this.renderer = this.el.sceneEl.renderer;
-  //     this.camera = this.el.camera;
-  //     this.scene = this.el.object3D;
+        // Helper functions for reading from depth buffer.
+        float readDepth (sampler2D depthSampler, vec2 coord) {
+          float fragCoordZ = texture2D(depthSampler, coord).x;
+          float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+          return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+        }
+        float getLinearDepth(vec3 pos) {
+          return -(viewMatrix * vec4(pos, 1.0)).z;
+        }
   
-  //     if (!this.renderer) {
-  //       console.error("Renderer is not available. Ensure the scene is properly initialized.");
-  //       return;
-  //     }
+        float getLinearScreenDepth(sampler2D map) {
+            vec2 uv = gl_FragCoord.xy * screenSize.zw;
+            return readDepth(map,uv);
+        }
+        // Helper functions for reading normals and depth of neighboring pixels.
+        float getPixelDepth(int x, int y) {
+          // screenSize.zw is pixel size 
+          // vUv is current position
+          return readDepth(depthBuffer, vUv + screenSize.zw * vec2(x, y));
+        }
+        vec3 getPixelNormal(int x, int y) {
+          return texture2D(normalBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
+        }
   
-  //     // Store the original render function
-  //     this.originalRender = this.renderer.render;
+        float saturate(float num) {
+          return clamp(num, 0.0, 1.0);
+        }
   
-  //     this.setupEffect();
-  //   },
+        void main() {
+          vec4 sceneColor = texture2D(sceneColorBuffer, vUv);
+          float depth = getPixelDepth(0, 0);
+          vec3 normal = getPixelNormal(0, 0);
   
-  //   update: function () {
-  //     this.setupEffect();
-  //   },
+          // Get the difference between depth of neighboring pixels and current.
+          float depthDiff = 0.0;
+          depthDiff += abs(depth - getPixelDepth(1, 0));
+          depthDiff += abs(depth - getPixelDepth(-1, 0));
+          depthDiff += abs(depth - getPixelDepth(0, 1));
+          depthDiff += abs(depth - getPixelDepth(0, -1));
   
-  //   setupEffect: function () {
-  //     // Clear existing composer if it exists
-  //     if (this.composer) {
-  //       this.composer.passes = [];
-  //       this.composer = null;
-  //     }
+          // Get the difference between normals of neighboring pixels and current
+          float normalDiff = 0.0;
+          normalDiff += distance(normal, getPixelNormal(1, 0));
+          normalDiff += distance(normal, getPixelNormal(0, 1));
+          normalDiff += distance(normal, getPixelNormal(0, 1));
+          normalDiff += distance(normal, getPixelNormal(0, -1));
   
-  //     if (this.occlusionComposer) {
-  //       this.occlusionComposer.passes = [];
-  //       this.occlusionComposer = null;
-  //     }
+          normalDiff += distance(normal, getPixelNormal(1, 1));
+          normalDiff += distance(normal, getPixelNormal(1, -1));
+          normalDiff += distance(normal, getPixelNormal(-1, 1));
+          normalDiff += distance(normal, getPixelNormal(-1, -1));
   
-  //     // Restore the original render function if the effect is "none"
-  //     if (this.data.effect === "none") {
-  //       this.renderer.render = this.originalRender;
-  //       return;
-  //     }
+          // Apply multiplier & bias to each 
+          float depthBias = multiplierParameters.x;
+          float depthMultiplier = multiplierParameters.y;
+          float normalBias = multiplierParameters.z;
+          float normalMultiplier = multiplierParameters.w;
   
-  //     // Initialize EffectComposer with the renderer
-  //     this.composer = new EffectComposer(this.renderer);
+          depthDiff = depthDiff * depthMultiplier;
+          depthDiff = saturate(depthDiff);
+          depthDiff = pow(depthDiff, depthBias);
   
-  //     // Add a render pass for the scene and camera
-  //     const renderPass = new RenderPass(this.scene, this.camera);
-  //     this.composer.addPass(renderPass);
+          normalDiff = normalDiff * normalMultiplier;
+          normalDiff = saturate(normalDiff);
+          normalDiff = pow(normalDiff, normalBias);
   
-  //     // Add the selected effect pass
-  //     if (this.data.effect === "sketchy-pencil") {
-  //       const pencilLinesPass = new PencilLinesPass({
-  //         width: this.renderer.domElement.clientWidth,
-  //         height: this.renderer.domElement.clientHeight,
-  //         scene: this.scene,
-  //         camera: this.camera,
-  //       });
-  //       pencilLinesPass.renderToScreen = false;
-  //       this.composer.addPass(pencilLinesPass);
-  //     } else if (this.data.effect === "halftone") {
-  //       const halftoneParams = getParams(this.data.halftoneParams);
-  //       const halftonePass = new HalftonePass(window.innerWidth, window.innerHeight, halftoneParams);
-  //       this.composer.addPass(halftonePass);
-  //     } else if (this.data.effect === "old-film") {
-  //       const oldFilmParams = getParams(this.data.oldFilmParams);
-  //       const filmPass = new FilmPass();
-  //       filmPass.material.uniforms.grayscale.value = oldFilmParams.grayscale;
-  //       filmPass.material.uniforms.nIntensity.value = oldFilmParams.nIntensity;
-  //       filmPass.material.uniforms.sIntensity.value = oldFilmParams.sIntensity;
-  //       filmPass.material.uniforms.sCount.value = oldFilmParams.sCount;
-  //       this.composer.addPass(filmPass);
-  //       const vignettePass = new ShaderPass(VignetteShader);
-  //       vignettePass.uniforms.offset.value = 1.5;
-  //       vignettePass.uniforms.darkness.value = 0.9;
-  //       vignettePass.renderToScreen = true;
-  //       this.composer.addPass(vignettePass);
-  //     } else if (this.data.effect === "pixel") {
-  //       const pixelParams = getParams(this.data.pixelParams);
-  //       const pixelPass = new RenderPixelatedPass(pixelParams.pixelSize, this.scene, this.camera, pixelParams);
-  //       this.composer.addPass(pixelPass);
-  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-  //       this.composer.addPass(gammaCorrectionPass);
-  //     } else if (this.data.effect === "glitch") {
-  //       const glitchParams = getParams(this.data.glitchParams);
-  //       const glitchPass = new GlitchPass();
-  //       glitchPass.goWild = glitchParams.goWild;
-  //       glitchPass.enabled = glitchParams.enabled;
-  //       this.composer.addPass(glitchPass);
-  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-  //       this.composer.addPass(gammaCorrectionPass);
-  //     } else if (this.data.effect === "sobel") {
-  //       const sobelParams = getParams(this.data.sobelParams);
-  //       const sobelPass = new ShaderPass(SobelOperatorShader);
-  //       sobelPass.enabled = sobelParams.enabled;
-  //       sobelPass.uniforms.resolution.value.x = window.innerWidth * window.devicePixelRatio;
-  //       sobelPass.uniforms.resolution.value.y = window.innerHeight * window.devicePixelRatio;
-  //       this.composer.addPass(sobelPass);
-  //     } else if (this.data.effect === "bloom") {
-  //       const bloomParams = getParams(this.data.bloomParams);
-  //       const bloomPass = new UnrealBloomPass(
-  //         new THREE.Vector2(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight),
-  //         1.5,
-  //         0.4,
-  //         0.85
-  //       );
-  //       bloomPass.threshold = bloomParams.threshold;
-  //       bloomPass.strength = bloomParams.strength;
-  //       bloomPass.radius = bloomParams.radius;
-  //       this.composer.addPass(bloomPass);
-  //       const outputPass = new OutputPass(THREE.ReinhardToneMapping);
-  //       outputPass.toneMappingExposure = bloomParams.exposure;
-  //       this.composer.addPass(outputPass);
-  //     } else if (this.data.effect === "dot-screen") {
-  //       const dotScreenParams = getParams(this.data.dotScreenParams);
-  //       const dotScreenPass = new ShaderPass(DotScreenShader);
-  //       dotScreenPass.uniforms.scale.value = dotScreenParams.scale;
-  //       dotScreenPass.uniforms.angle.value = dotScreenParams.angle;
-  //       this.composer.addPass(dotScreenPass);
-  //       const rgbShiftPass = new ShaderPass(RGBShiftShader);
-  //       rgbShiftPass.uniforms.amount.value = 0.0015;
-  //       this.composer.addPass(rgbShiftPass);
-  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-  //       this.composer.addPass(gammaCorrectionPass);
-  //     } else if (this.data.effect === "volumetric-light") {
-  //       this.DEFAULT_LAYER = 0;
-  //       this.OCCLUSION_LAYER = 1;
-  //       const renderTarget = new THREE.WebGLRenderTarget(
-  //         0.5 * this.renderer.domElement.clientWidth,
-  //         0.5 * this.renderer.domElement.clientHeight
-  //       );
-  //       this.occlusionComposer = new EffectComposer(this.renderer, renderTarget);
-  //       this.occlusionComposer.addPass(new RenderPass(this.scene, this.camera));
-  //       const volumetricLightParams = getParams(this.data.volumetricLightParams);
-  //       const volumetricLightPass = new ShaderPass(VolumetericLightShader);
-  //       volumetricLightPass.uniforms.decay.value = volumetricLightParams.decay;
-  //       volumetricLightPass.uniforms.density.value = volumetricLightParams.density;
-  //       volumetricLightPass.uniforms.exposure.value = volumetricLightParams.exposure;
-  //       volumetricLightPass.uniforms.samples.value = volumetricLightParams.samples;
-  //       this.occlusionComposer.addPass(volumetricLightPass);
-  //       this.composer = new EffectComposer(this.renderer);
-  //       this.composer.addPass(new RenderPass(this.scene, this.camera));
-  //       const additiveBlendingPass = new ShaderPass(AdditiveBlendingShader);
-  //       additiveBlendingPass.uniforms.tAdd.value = renderTarget.texture;
-  //       this.composer.addPass(additiveBlendingPass);
-  //       additiveBlendingPass.renderToScreen = true;
-  //       this.camera.layers.set(this.OCCLUSION_LAYER);
-  //       this.renderer.setClearColor(0);
-  //       this.occlusionComposer.render();
-  //       this.camera.layers.set(this.DEFAULT_LAYER);
-  //       this.renderer.setClearColor(591377);
-  //     } else if (this.data.effect === "afterimage") {
-  //       const afterimageParams = getParams(this.data.afterimageParams);
-  //       const afterimagePass = new AfterimagePass();
-  //       afterimagePass.uniforms.damp.value = afterimageParams.damp;
-  //       this.composer.addPass(afterimagePass);
-  //       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
-  //       this.composer.addPass(gammaCorrectionPass);
-  //     } else if (this.data.effect === "bad-tv") {
-  //       const badTVParams = getParams(this.data.badTVParams);
-  //       const badTVPass = new ShaderPass(BadTVShader);
-  //       const rgbShiftPass = new ShaderPass(RGBShiftShader);
-  //       const filmPass = new ShaderPass(FilmShader);
-  //       const staticPass = new ShaderPass(StaticShader);
-  //       const copyPass = new ShaderPass(CopyShader);
-  //       filmPass.uniforms.grayscale.value = 0;
-  //       const staticParams = { show: true, amount: 0.5, size: 4 };
-  //       const rgbShiftParams = { show: true, amount: 0.005, angle: 0 };
-  //       const filmParams = { show: true, count: 800, sIntensity: 0.9, nIntensity: 0.4 };
-  //       let time = 0;
-  //       const animate = () => {
-  //         time += 0.1;
-  //         badTVPass.uniforms.time.value = time;
-  //         filmPass.uniforms.time.value = time;
-  //         staticPass.uniforms.time.value = time;
-  //         requestAnimationFrame(animate);
-  //       };
-  //       badTVPass.uniforms.distortion.value = badTVParams.distortion;
-  //       badTVPass.uniforms.distortion2.value = badTVParams.distortion2;
-  //       badTVPass.uniforms.speed.value = badTVParams.speed;
-  //       badTVPass.uniforms.rollSpeed.value = badTVParams.rollSpeed;
-  //       staticPass.uniforms.amount.value = staticParams.amount;
-  //       staticPass.uniforms.size.value = staticParams.size;
-  //       rgbShiftPass.uniforms.angle.value = rgbShiftParams.angle * Math.PI;
-  //       rgbShiftPass.uniforms.amount.value = rgbShiftParams.amount;
-  //       filmPass.uniforms.sCount.value = filmParams.count;
-  //       filmPass.uniforms.sIntensity.value = filmParams.sIntensity;
-  //       filmPass.uniforms.nIntensity.value = filmParams.nIntensity;
-  //       this.composer.addPass(badTVPass);
-  //       this.composer.addPass(rgbShiftPass);
-  //       this.composer.addPass(filmPass);
-  //       this.composer.addPass(staticPass);
-  //       this.composer.addPass(copyPass);
-  //       animate();
-  //     }
   
-  //     this.bind();
-  //   },
+          float outline = normalDiff + depthDiff;
+        
+          // Combine outline with scene color.
+          vec4 outlineColor = vec4(outlineColor, 1.0);
+          gl_FragColor = vec4(mix(sceneColor, outlineColor, outline));
   
-  //   bind: function () {
-  //     const self = this;
-  //     let isRendering = false;
+          // For debug visualization of the different inputs to this shader.
+          if (debugVisualize == 1) {
+            gl_FragColor = sceneColor;
+          }
+          if (debugVisualize == 2) {
+            gl_FragColor = vec4(vec3(depth), 1.0);
+          }
+          if (debugVisualize == 3) {
+            gl_FragColor = vec4(normal, 1.0);
+          }
+          if (debugVisualize == 4) {
+            gl_FragColor = vec4(vec3(outline * outlineColor), 1.0);
+          }
+        }
+        `;
+  }
+
+  createOutlinePostProcessMaterial() {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        debugVisualize: { value: 0 },
+        sceneColorBuffer: {},
+        depthBuffer: {},
+        normalBuffer: {},
+        outlineColor: { value: new THREE.Color(0xffffff) },
+        //4 scalar values packed in one uniform: depth multiplier, depth bias, and same for normals.
+        multiplierParameters: { value: new THREE.Vector4(1, 1, 1, 1) },
+        cameraNear: { value: this.renderCamera.near },
+        cameraFar: { value: this.renderCamera.far },
+        screenSize: {
+          value: new THREE.Vector4(
+            this.resolution.x,
+            this.resolution.y,
+            1 / this.resolution.x,
+            1 / this.resolution.y
+          ),
+        },
+      },
+      vertexShader: this.vertexShader,
+      fragmentShader: this.fragmentShader,
+    });
+  }
+}
+
+const FXAAShader = {
+  name: "FXAAShader",
+
+  uniforms: {
+    tDiffuse: { value: null },
+    resolution: { value: new Vector2(1 / 1024, 1 / 512) },
+  },
+
+  vertexShader: /* glsl */ `
   
-  //     this.renderer.render = function () {
-  //       if (isRendering) {
-  //         self.originalRender.apply(this, arguments);
-  //       } else {
-  //         isRendering = true;
-  //         if (self.occlusionComposer) {
-  //           self.occlusionComposer.render(self.delta);
-  //         } else if (self.composer) {
-  //           self.composer.render(self.delta);
-  //         }
-  //         isRendering = false;
-  //       }
-  //     };
-  //   },
-// });
+      varying vec2 vUv;
   
+      void main() {
+  
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+  
+      }`,
+
+  fragmentShader: /* glsl */ `
+  
+      // FXAA algorithm from NVIDIA, C# implementation by Jasper Flick, GLSL port by Dave Hoskins
+      // http://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
+      // https://catlikecoding.com/unity/tutorials/advanced-rendering/fxaa/
+  
+      uniform sampler2D tDiffuse;
+      uniform vec2 resolution;
+      varying vec2 vUv;
+  
+      #define EDGE_STEP_COUNT 6
+      #define EDGE_GUESS 8.0
+      #define EDGE_STEPS 1.0, 1.5, 2.0, 2.0, 2.0, 4.0
+      const float edgeSteps[EDGE_STEP_COUNT] = float[EDGE_STEP_COUNT]( EDGE_STEPS );
+  
+      float _ContrastThreshold = 0.0312;
+      float _RelativeThreshold = 0.063;
+      float _SubpixelBlending = 1.0;
+  
+      vec4 Sample( sampler2D  tex2D, vec2 uv ) {
+  
+        return texture( tex2D, uv );
+  
+      }
+  
+      float SampleLuminance( sampler2D tex2D, vec2 uv ) {
+  
+        return dot( Sample( tex2D, uv ).rgb, vec3( 0.3, 0.59, 0.11 ) );
+  
+      }
+  
+      float SampleLuminance( sampler2D tex2D, vec2 texSize, vec2 uv, float uOffset, float vOffset ) {
+  
+        uv += texSize * vec2(uOffset, vOffset);
+        return SampleLuminance(tex2D, uv);
+  
+      }
+  
+      struct LuminanceData {
+  
+        float m, n, e, s, w;
+        float ne, nw, se, sw;
+        float highest, lowest, contrast;
+  
+      };
+  
+      LuminanceData SampleLuminanceNeighborhood( sampler2D tex2D, vec2 texSize, vec2 uv ) {
+  
+        LuminanceData l;
+        l.m = SampleLuminance( tex2D, uv );
+        l.n = SampleLuminance( tex2D, texSize, uv,  0.0,  1.0 );
+        l.e = SampleLuminance( tex2D, texSize, uv,  1.0,  0.0 );
+        l.s = SampleLuminance( tex2D, texSize, uv,  0.0, -1.0 );
+        l.w = SampleLuminance( tex2D, texSize, uv, -1.0,  0.0 );
+  
+        l.ne = SampleLuminance( tex2D, texSize, uv,  1.0,  1.0 );
+        l.nw = SampleLuminance( tex2D, texSize, uv, -1.0,  1.0 );
+        l.se = SampleLuminance( tex2D, texSize, uv,  1.0, -1.0 );
+        l.sw = SampleLuminance( tex2D, texSize, uv, -1.0, -1.0 );
+  
+        l.highest = max( max( max( max( l.n, l.e ), l.s ), l.w ), l.m );
+        l.lowest = min( min( min( min( l.n, l.e ), l.s ), l.w ), l.m );
+        l.contrast = l.highest - l.lowest;
+        return l;
+  
+      }
+  
+      bool ShouldSkipPixel( LuminanceData l ) {
+  
+        float threshold = max( _ContrastThreshold, _RelativeThreshold * l.highest );
+        return l.contrast < threshold;
+  
+      }
+  
+      float DeterminePixelBlendFactor( LuminanceData l ) {
+  
+        float f = 2.0 * ( l.n + l.e + l.s + l.w );
+        f += l.ne + l.nw + l.se + l.sw;
+        f *= 1.0 / 12.0;
+        f = abs( f - l.m );
+        f = clamp( f / l.contrast, 0.0, 1.0 );
+  
+        float blendFactor = smoothstep( 0.0, 1.0, f );
+        return blendFactor * blendFactor * _SubpixelBlending;
+  
+      }
+  
+      struct EdgeData {
+  
+        bool isHorizontal;
+        float pixelStep;
+        float oppositeLuminance, gradient;
+  
+      };
+  
+      EdgeData DetermineEdge( vec2 texSize, LuminanceData l ) {
+  
+        EdgeData e;
+        float horizontal =
+          abs( l.n + l.s - 2.0 * l.m ) * 2.0 +
+          abs( l.ne + l.se - 2.0 * l.e ) +
+          abs( l.nw + l.sw - 2.0 * l.w );
+        float vertical =
+          abs( l.e + l.w - 2.0 * l.m ) * 2.0 +
+          abs( l.ne + l.nw - 2.0 * l.n ) +
+          abs( l.se + l.sw - 2.0 * l.s );
+        e.isHorizontal = horizontal >= vertical;
+  
+        float pLuminance = e.isHorizontal ? l.n : l.e;
+        float nLuminance = e.isHorizontal ? l.s : l.w;
+        float pGradient = abs( pLuminance - l.m );
+        float nGradient = abs( nLuminance - l.m );
+  
+        e.pixelStep = e.isHorizontal ? texSize.y : texSize.x;
+        
+        if (pGradient < nGradient) {
+  
+          e.pixelStep = -e.pixelStep;
+          e.oppositeLuminance = nLuminance;
+          e.gradient = nGradient;
+  
+        } else {
+  
+          e.oppositeLuminance = pLuminance;
+          e.gradient = pGradient;
+  
+        }
+  
+        return e;
+  
+      }
+  
+      float DetermineEdgeBlendFactor( sampler2D  tex2D, vec2 texSize, LuminanceData l, EdgeData e, vec2 uv ) {
+  
+        vec2 uvEdge = uv;
+        vec2 edgeStep;
+        if (e.isHorizontal) {
+  
+          uvEdge.y += e.pixelStep * 0.5;
+          edgeStep = vec2( texSize.x, 0.0 );
+  
+        } else {
+  
+          uvEdge.x += e.pixelStep * 0.5;
+          edgeStep = vec2( 0.0, texSize.y );
+  
+        }
+  
+        float edgeLuminance = ( l.m + e.oppositeLuminance ) * 0.5;
+        float gradientThreshold = e.gradient * 0.25;
+  
+        vec2 puv = uvEdge + edgeStep * edgeSteps[0];
+        float pLuminanceDelta = SampleLuminance( tex2D, puv ) - edgeLuminance;
+        bool pAtEnd = abs( pLuminanceDelta ) >= gradientThreshold;
+  
+        for ( int i = 1; i < EDGE_STEP_COUNT && !pAtEnd; i++ ) {
+  
+          puv += edgeStep * edgeSteps[i];
+          pLuminanceDelta = SampleLuminance( tex2D, puv ) - edgeLuminance;
+          pAtEnd = abs( pLuminanceDelta ) >= gradientThreshold;
+  
+        }
+  
+        if ( !pAtEnd ) {
+  
+          puv += edgeStep * EDGE_GUESS;
+  
+        }
+  
+        vec2 nuv = uvEdge - edgeStep * edgeSteps[0];
+        float nLuminanceDelta = SampleLuminance( tex2D, nuv ) - edgeLuminance;
+        bool nAtEnd = abs( nLuminanceDelta ) >= gradientThreshold;
+  
+        for ( int i = 1; i < EDGE_STEP_COUNT && !nAtEnd; i++ ) {
+  
+          nuv -= edgeStep * edgeSteps[i];
+          nLuminanceDelta = SampleLuminance( tex2D, nuv ) - edgeLuminance;
+          nAtEnd = abs( nLuminanceDelta ) >= gradientThreshold;
+  
+        }
+  
+        if ( !nAtEnd ) {
+  
+          nuv -= edgeStep * EDGE_GUESS;
+  
+        }
+  
+        float pDistance, nDistance;
+        if ( e.isHorizontal ) {
+  
+          pDistance = puv.x - uv.x;
+          nDistance = uv.x - nuv.x;
+  
+        } else {
+          
+          pDistance = puv.y - uv.y;
+          nDistance = uv.y - nuv.y;
+  
+        }
+  
+        float shortestDistance;
+        bool deltaSign;
+        if ( pDistance <= nDistance ) {
+  
+          shortestDistance = pDistance;
+          deltaSign = pLuminanceDelta >= 0.0;
+  
+        } else {
+  
+          shortestDistance = nDistance;
+          deltaSign = nLuminanceDelta >= 0.0;
+  
+        }
+  
+        if ( deltaSign == ( l.m - edgeLuminance >= 0.0 ) ) {
+  
+          return 0.0;
+  
+        }
+  
+        return 0.5 - shortestDistance / ( pDistance + nDistance );
+  
+      }
+  
+      vec4 ApplyFXAA( sampler2D  tex2D, vec2 texSize, vec2 uv ) {
+  
+        LuminanceData luminance = SampleLuminanceNeighborhood( tex2D, texSize, uv );
+        if ( ShouldSkipPixel( luminance ) ) {
+  
+          return Sample( tex2D, uv );
+  
+        }
+  
+        float pixelBlend = DeterminePixelBlendFactor( luminance );
+        EdgeData edge = DetermineEdge( texSize, luminance );
+        float edgeBlend = DetermineEdgeBlendFactor( tex2D, texSize, luminance, edge, uv );
+        float finalBlend = max( pixelBlend, edgeBlend );
+  
+        if (edge.isHorizontal) {
+  
+          uv.y += edge.pixelStep * finalBlend;
+  
+        } else {
+  
+          uv.x += edge.pixelStep * finalBlend;
+  
+        }
+  
+        return Sample( tex2D, uv );
+  
+      }
+  
+      void main() {
+  
+        gl_FragColor = ApplyFXAA( tDiffuse, resolution.xy, vUv );
+        
+      }`,
+};
+////////////////////////
+// Moebius Effect ///// https://github.com/txstc55/moebius-effect-threejs
+//////////////////////
+class PencilLinesPass2 extends Pass {
+  constructor(width, height, scene, camera) {
+    super();
+    this.scene = scene;
+    this.camera = camera;
+
+    this.material = new MoebiusMaterial();
+    this.randomNumbers = new Array(32);
+    for (var i = 0; i < 32; i++) {
+      this.randomNumbers[i] = Math.random() * 90 + 7.0;
+    }
+    this.material.uniforms.timerRandoms.value = this.randomNumbers;
+    this.lastTime = Date.now();
+
+    this.fsQuad = new FullScreenQuad(this.material);
+    this.material.uniforms.uResolution.value = new THREE.Vector2(width, height);
+
+    // for normal buffer
+    const normalBuffer = new THREE.WebGLRenderTarget(width, height);
+
+    normalBuffer.texture.format = THREE.RGBAFormat;
+    normalBuffer.texture.type = THREE.HalfFloatType;
+    normalBuffer.texture.minFilter = THREE.NearestFilter;
+    normalBuffer.texture.magFilter = THREE.NearestFilter;
+    normalBuffer.texture.generateMipmaps = false;
+    normalBuffer.stencilBuffer = false;
+    this.normalBuffer = normalBuffer;
+
+    this.normalMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        lightPos: { value: new THREE.Vector3(0, 4.0, 0.0) },
+        cameraPos: { value: new THREE.Vector3(0, 0, 0) },
+      },
+      vertexShader: `
+          varying vec3 vNormal;
+          varying vec3 vWorldPosition;
+      
+          void main() {
+              vNormal = normalize(mat3(modelMatrix) * normal);
+              vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+              gl_Position = projectionMatrix * (modelViewMatrix * vec4(position, 1.0));
+          }
+          
+          `,
+      fragmentShader: `
+          uniform vec3 cameraPos;
+          uniform vec3 lightPos; // in world space
+      
+          varying vec3 vNormal;
+          varying vec3 vWorldPosition;
+      
+          void main() {
+              // Calculate view direction in world space
+              vec3 viewDir = normalize(cameraPos - vWorldPosition);
+      
+              // Specular term
+              vec3 lightDir = normalize(lightPos - vWorldPosition);
+              vec3 reflectDir = reflect(-lightDir, vNormal);
+              float spec = pow(max(dot(viewDir, reflectDir), 0.0), length(lightPos - vWorldPosition) * 4.0);
+              // gl_FragColor = vec4(spec, spec, spec, 1.0);
+
+              // diffuse term
+              float diff = max(dot(vNormal, lightDir), 0.0);
+              if (spec > 0.59){
+                  gl_FragColor = vec4(100000.0, 100000.0, 100000.0, 1.0);
+              }else if (diff > 0.95){
+                  gl_FragColor = vec4(2000.0, 2000.0, 2000.0, 1.0);
+              }else{
+                  gl_FragColor = vec4(vNormal, 1.0);
+              }
+              // gl_FragColor = vec4(viewDir, 1.0);
+          }
+          `,
+    });
+  }
+
+  dispose() {
+    this.material.dispose();
+    this.fsQuad.dispose();
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    renderer.setRenderTarget(this.normalBuffer);
+    const overrideMaterialBefore = this.scene.overrideMaterial;
+
+    this.normalMaterial.uniforms.cameraPos.value = this.camera.position;
+    this.scene.overrideMaterial = this.normalMaterial;
+
+    renderer.render(this.scene, this.camera);
+    this.scene.overrideMaterial = overrideMaterialBefore;
+    this.material.uniforms.uNormals.value = this.normalBuffer.texture;
+    this.material.uniforms.tDiffuse.value = readBuffer.texture;
+
+    // check passed time
+    var currentTime = Date.now();
+    if (currentTime - this.lastTime > 1000) {
+      for (var i = 0; i < 32; i++) {
+        this.randomNumbers[i] = Math.random() * 40.0 + 7.0;
+      }
+      this.material.uniforms.timerRandoms.value = this.randomNumbers;
+      this.lastTime = Date.now();
+    }
+
+    if (this.renderToScreen) {
+      renderer.setRenderTarget(null);
+      this.fsQuad.render(renderer);
+    } else {
+      renderer.setRenderTarget(writeBuffer);
+      if (this.clear) renderer.clear();
+      this.fsQuad.render(renderer);
+    }
+  }
+  changeLight(lightPos) {
+    this.normalMaterial.uniforms.lightPos.value = lightPos;
+  }
+
+  // resize the canvas
+  resize(width, height) {
+    this.material.uniforms.uResolution.value = new THREE.Vector2(width, height);
+  }
+}
+
+class MoebiusMaterial extends THREE.ShaderMaterial {
+  constructor() {
+    const vertexShader = `
+    varying vec2 vUv;
+    uniform vec2 uResolution;
+    void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+    }
+`;
+
+    const fragmentShader = `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uResolution;
+    uniform sampler2D uNormals;
+    uniform float timerRandoms[32];
+
+    varying vec2 vUv;
+
+    float rand(vec2 co){
+        return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    float randDispl(float xCoord, float yCoord, float resolutionX, float resolutionY, float factor, vec4 randVariables){
+        float randNum = rand(vec2(xCoord, yCoord));
+        float disp = ((1.0 + randNum) * (sin(yCoord*resolutionY / randVariables.x)) * factor + (1.0 + randNum) * (sin(yCoord*resolutionY / randVariables.y)) * factor  + (1.0 + randNum) * (sin(yCoord*resolutionY / randVariables.z)) * factor  + (1.0 + randNum) * (sin(yCoord*resolutionY / randVariables.w)) * factor) / 4.0;
+        return disp;
+    }
+
+    float valueAtPoint(sampler2D image, vec2 coord, vec2 texel, vec2 point) {
+        vec3 luma = vec3(0.299, 0.587, 0.114);
+        // here we have a rand so we have the pencil line effect
+        // 2.0*rand(coord)*
+        return dot(texture2D(image, coord + texel * point).xyz, luma);
+    }
+
+    float diffuseValue(float x, float y) {
+        return valueAtPoint(tDiffuse, vUv, vec2(1.0 / uResolution.x, 1.0 / uResolution.y), vec2(x, y)) * 0.6;
+    }
+    float normalValue(float x, float y) {
+        return valueAtPoint(uNormals, vUv, vec2(1.0 / uResolution.x, 1.0 / uResolution.y), vec2(x, y)) * 0.4;
+    }
+
+    float getValue(float x, float y) {
+        return diffuseValue(x, y) + normalValue(x, y);
+    }
+
+    float combinedSobelValue() {
+        // kernel definition (in glsl matrices are filled in column-major order)
+        const mat3 Gx = mat3(-1, -2, -1, 0, 0, 0, 1, 2, 1);// x direction kernel
+        const mat3 Gy = mat3(-1, 0, 1, -2, 0, 2, -1, 0, 1);// y direction kernel
+
+        // fetch the 3x3 neighbourhood of a fragment
+
+        // first column
+        float xDisp = randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5, vec4(22.0, 13.0, 37.0, 89.0));
+        float yDisp = randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5, vec4(22.0, 13.0, 37.0, 89.0));
+
+        float tx0y0 = getValue(-1.0+ xDisp, -1.0 + yDisp);
+        float tx0y1 = getValue(-1.0+ xDisp, 0.0 + yDisp);
+        float tx0y2 = getValue(-1.0+ xDisp, 1.0 + yDisp);
+
+        // second column
+        float tx1y0 = getValue(0.0+ xDisp, -1.0 + yDisp);
+        float tx1y1 = getValue(0.0+ xDisp, 0.0 + yDisp);
+        float tx1y2 = getValue(0.0+ xDisp, 1.0 + yDisp);
+
+        // third column
+        float tx2y0 = getValue(1.0+ xDisp, -1.0 + yDisp);
+        float tx2y1 = getValue(1.0+ xDisp, 0.0 + yDisp);
+        float tx2y2 = getValue(1.0+ xDisp, 1.0 + yDisp);
+
+        // gradient value in x direction
+        float valueGx = Gx[0][0] * tx0y0 + Gx[1][0] * tx1y0 + Gx[2][0] * tx2y0 +
+        Gx[0][1] * tx0y1 + Gx[1][1] * tx1y1 + Gx[2][1] * tx2y1 +
+        Gx[0][2] * tx0y2 + Gx[1][2] * tx1y2 + Gx[2][2] * tx2y2;
+
+        // gradient value in y direction
+        float valueGy = Gy[0][0] * tx0y0 + Gy[1][0] * tx1y0 + Gy[2][0] * tx2y0 +
+        Gy[0][1] * tx0y1 + Gy[1][1] * tx1y1 + Gy[2][1] * tx2y1 +
+        Gy[0][2] * tx0y2 + Gy[1][2] * tx1y2 + Gy[2][2] * tx2y2;
+
+        // magnitude of the total gradient
+        float G = (valueGx * valueGx) + (valueGy * valueGy);
+        return clamp(G, 0.0, 1.0);
+    }
+
+    float luma(vec4 color){
+        return 0.2126*color.x + 0.7152*color.y + 0.0722*color.z;
+    }
+    vec3 czm_saturation(vec3 rgb, float adjustment)
+    {
+        // Algorithm from Chapter 16 of OpenGL Shading Language
+        const vec3 W = vec3(0.2125, 0.7154, 0.0721);
+        vec3 intensity = vec3(dot(rgb, W));
+        return mix(intensity, rgb, adjustment);
+    }
+
+
+
+    void main() {
+        float sobelValue = combinedSobelValue();
+        sobelValue = smoothstep(0.01, 0.03, sobelValue);
+
+        vec4 lineColor = vec4(0.0, 0.0, 0.0, 1.0);
+
+        if (sobelValue > 0.1) {
+            gl_FragColor = lineColor;
+        } else {
+            vec4 normalColor = texture2D(uNormals, vUv);
+
+            // now we make the texture
+            if (normalColor.x > 2000.0 && normalColor.y > 2000.0 && normalColor.z > 2000.0){
+                gl_FragColor = vec4(240.0/255.0, 234.0/255.0, 214.0/255.0, 1.0);
+            }else if (normalColor.x > 100.0 && normalColor.y > 100.0 && normalColor.z > 100.0){
+                gl_FragColor = vec4(czm_saturation((texture2D(tDiffuse, vUv) * 0.5 + vec4(240.0/255.0, 234.0/255.0, 214.0/255.0, 1.0) * 0.5).xyz, 0.4), 1.0);
+            }else{
+                // we will also need to distort the texture a bit
+
+
+                float xDisps[5] = float[](randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5 / uResolution.x, vec4(22.0, 13.0, 37.0, 89.0)), randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5 / uResolution.x, vec4(timerRandoms[0], timerRandoms[1], timerRandoms[2], timerRandoms[3])), randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5 / uResolution.x, vec4(timerRandoms[4], timerRandoms[5], timerRandoms[6], timerRandoms[7])), randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5 / uResolution.x, vec4(timerRandoms[8], timerRandoms[9], timerRandoms[10], timerRandoms[11])), randDispl(vUv.x, vUv.y, uResolution.x, uResolution.y, 1.5 / uResolution.x, vec4(timerRandoms[12], timerRandoms[13], timerRandoms[14], timerRandoms[15])));
+
+                float yDisps[5] = float[](randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5 / uResolution.y, vec4(22.0, 13.0, 37.0, 89.0)), randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5 / uResolution.y, vec4(timerRandoms[16], timerRandoms[17], timerRandoms[18], timerRandoms[19])), randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5 / uResolution.y, vec4(timerRandoms[20], timerRandoms[21], timerRandoms[22], timerRandoms[23])), randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5 / uResolution.y, vec4(timerRandoms[24], timerRandoms[25], timerRandoms[26], timerRandoms[7])), randDispl(vUv.y, vUv.x, uResolution.y, uResolution.x, 1.5 / uResolution.y, vec4(timerRandoms[28], timerRandoms[29], timerRandoms[30], timerRandoms[31])));
+
+
+                vec2 vUvNew = vUv + vec2(xDisps[0], yDisps[0]);
+                gl_FragColor =  vec4(czm_saturation(texture2D(tDiffuse, vUvNew).xyz, 0.3), 1.0);
+
+                vec4 pixelColor = texture2D(tDiffuse, vUvNew);
+                float pixelLuma = luma(pixelColor);
+                if (pixelLuma <= 0.32){
+                    float stripe = mod((vUv.y * uResolution.y + vUv.x * uResolution.x) / 17.7, 4.0);
+                    if (stripe <= 1.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[1], yDisps[1]);
+                        if (mod(vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }else if (stripe <= 2.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 3.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 4.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[3], yDisps[3]);
+                        if (mod(vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                }
+                if (pixelLuma <= 0.48){
+                    float stripe = mod((vUv.y * uResolution.y + vUv.x * uResolution.x) / 17.7, 4.0);
+                    if (stripe <= 1.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[1], yDisps[1]);
+                        if (mod(vUvStripe.y * uResolution.y, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }else if (stripe <= 2.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.y * uResolution.y, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 3.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.y * uResolution.y, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 4.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[3], yDisps[3]);
+                        if (mod(vUvStripe.y * uResolution.y, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                }
+                if (pixelLuma <= 0.64){
+                    float stripe = mod((-vUv.y * uResolution.y + vUv.x * uResolution.x) / (17.7 + 5.0 * sin(-vUv.y * uResolution.y + vUv.x * uResolution.x)), 4.0);
+                    if (stripe <= 1.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[1], yDisps[1]);
+                        if (mod(-vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }else if (stripe <= 2.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(-vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 3.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(-vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 4.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[3], yDisps[3]);
+                        if (mod(-vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                }
+                if (pixelLuma <= 0.75){
+                    float stripe = mod((vUv.y * uResolution.y + vUv.x * uResolution.x) / (17.7 + 5.0 * sin(vUv.y * uResolution.y + vUv.x * uResolution.x)), 4.0);
+                    if (stripe <= 1.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[1], yDisps[1]);
+                        if (mod(vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }else if (stripe <= 2.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 3.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[2], yDisps[2]);
+                        if (mod(vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.5){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    else if (stripe <= 4.0){
+                        vec2 vUvStripe = vUv + vec2(xDisps[3], yDisps[3]);
+                        if (mod(vUvStripe.y * uResolution.y + vUvStripe.x * uResolution.x, 17.7) <=1.){
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                }
+                if (pixelLuma > 0.75){
+                    gl_FragColor = vec4(czm_saturation((texture2D(tDiffuse, vUv) * 0.7 + vec4(240.0/255.0, 234.0/255.0, 214.0/255.0, 1.0) * 0.3).xyz, 0.4), 1.0);
+                }
+            }
+        }
+    }
+`;
+    super({
+      uniforms: {
+        tDiffuse: { value: null },
+        uNormals: { value: null },
+        timerRandoms: { value: [] },
+        uResolution: {
+          value: new THREE.Vector2(1, 1),
+        },
+      },
+      fragmentShader,
+      vertexShader,
+    });
+  }
+}
+
+function getParams(str) {
+  const params = {};
+  const cleanedStr = str.replace(/\s/g, ""); // Remove all whitespace
+  const properties = cleanedStr.split(","); // Split by commas
+
+  for (let i = 0; i < properties.length; i++) {
+    const [key, value] = properties[i].split(":"); // Split each property into key and value
+    params[key] = eval(value); // Evaluate the value (e.g., convert "1" to 1, "Math.PI" to 3.14159, etc.)
+  }
+
+  return params;
+}
+
 AFRAME.registerComponent("post-processing", {
   schema: {
     effect: { type: "string", default: "none" },
     sketchyPencilParams: { type: "string", default: "none" },
-    halftoneParams: { type: "string", default: "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false" },
-    oldFilmParams: { type: "string", default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256" },
-    pixelParams: { type: "string", default: "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4" },
+    halftoneParams: {
+      type: "string",
+      default:
+        "shape: 1, radius: 6, rotateR: Math.PI / 12, rotateB: (Math.PI / 12) * 2, rotateG: (Math.PI / 12) * 3, scatter: 1, blending: 1, blendingMode: 1, greyscale: false, disable: false",
+    },
+    oldFilmParams: {
+      type: "string",
+      default: "grayscale: true, nIntensity: 0.3, sIntensity: 0.3, sCount: 256",
+    },
+    pixelParams: {
+      type: "string",
+      default:
+        "pixelSize: 12, normalEdgeStrength: 0.35, depthEdgeStrength: 0.4",
+    },
     glitchParams: { type: "string", default: "goWild: false, enabled: true" },
     sobelParams: { type: "string", default: "enabled: true" },
-    bloomParams: { type: "string", default: "threshold: 0.1, strength: 0.4, radius: 0.1, exposure: 1" },
+    bloomParams: {
+      type: "string",
+      default: "threshold: 0.1, strength: 0.4, radius: 0.1, exposure: 1",
+    },
     dotScreenParams: { type: "string", default: "scale: 4, angle: 90" },
-    volumetricLightParams: { type: "string", default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50" },
+    volumetricLightParams: {
+      type: "string",
+      default: "decay: 0.95, density: 0.5, exposure: 0.2, samples: 50",
+    },
     afterimageParams: { type: "string", default: "damp: 0.8" },
-    badTVParams: { type: "string", default: "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0" },
+    badTVParams: {
+      type: "string",
+      default:
+        "mute: true, show: true, distortion: 1.0, distortion2: 1.0, speed: 0.2, rollSpeed: 0",
+    },
+    customOutlineParams: {
+      type: "string",
+      default:
+        "outlineColor: 0xffffff, depthBias: 16, depthMult: 83, normalBias: 5, normalMult: 1.0",
+    },
+    moebiusParams: {
+      type: "string",
+      default: "none",
+    },
   },
 
   init: function () {
@@ -1625,7 +2289,9 @@ AFRAME.registerComponent("post-processing", {
     this.scene = this.el.object3D;
 
     if (!this.renderer) {
-      console.error("Renderer is not available. Ensure the scene is properly initialized.");
+      console.error(
+        "Renderer is not available. Ensure the scene is properly initialized."
+      );
       return;
     }
 
@@ -1633,9 +2299,9 @@ AFRAME.registerComponent("post-processing", {
     this.setupEffect();
 
     // Listen for changes in the effect select dropdown
-    const effectSelect = document.getElementById('effect-select');
-    effectSelect.addEventListener('change', (event) => {
-      this.el.setAttribute('post-processing', 'effect', event.target.value);
+    const effectSelect = document.getElementById("effect-select");
+    effectSelect.addEventListener("change", (event) => {
+      this.el.setAttribute("post-processing", "effect", event.target.value);
       this.updateEffectParamsUI(event.target.value);
     });
   },
@@ -1645,62 +2311,81 @@ AFRAME.registerComponent("post-processing", {
   },
 
   updateEffectParamsUI: function (effect) {
-    const paramsContainer = document.getElementById('effect-params');
-    paramsContainer.innerHTML = ''; // Clear previous parameters
-  
-    if (effect === 'none') return;
-  
+    const paramsContainer = document.getElementById("effect-params");
+    paramsContainer.innerHTML = ""; // Clear previous parameters
+
+    if (effect === "none") return;
+
     const params = this.getEffectParams(effect);
     if (Object.keys(params).length === 0) {
-      paramsContainer.innerHTML = '<p>No parameters available for this effect.</p>';
+      paramsContainer.innerHTML =
+        "<p>No parameters available for this effect.</p>";
       return;
     }
-  
+
     for (const [key, value] of Object.entries(params)) {
       // Create a container for each parameter
-      const paramContainer = document.createElement('div');
-      paramContainer.style.marginBottom = '10px';
-  
+      const paramContainer = document.createElement("div");
+      paramContainer.style.marginBottom = "10px";
+
       // Create a label for the parameter
-      const label = document.createElement('label');
+      const label = document.createElement("label");
       label.htmlFor = `param-${key}`;
       label.textContent = key;
       paramContainer.appendChild(label);
-  
-      // Create a range input for the parameter
-      const input = document.createElement('input');
-      input.type = 'range';
-      input.id = `param-${key}`;
-  
-      // Determine if the parameter is a whole number or a float
-      const isWholeNumber = Number.isInteger(value);
-  
-      // Set min, max, and step based on the parameter type
-      if (isWholeNumber) {
-        input.min = 0; // Minimum value for whole numbers
-        input.max = value * 5; // Set max to double the default value (or any other reasonable limit)
-        input.step = 1; // Step size for whole numbers
+
+      // Handle color picker for outlineColor
+      if (key === "outlineColor" && effect === "custom-outline") {
+        const colorInput = document.createElement("input");
+        colorInput.type = "color";
+        colorInput.id = `param-${key}`;
+        colorInput.value = `#${value.toString(16).padStart(6, "0")}`; // Convert color to hex format
+        paramContainer.appendChild(colorInput);
+
+        // Update the value display and effect parameter when the color changes
+        colorInput.addEventListener("input", (event) => {
+          const newValue = parseInt(event.target.value.replace("#", ""), 16); // Convert hex to number
+          this.updateEffectParam(effect, key, newValue);
+        });
       } else {
-        input.min = 0; // Minimum value for floats
-        input.max = 1; // Maximum value for floats (adjust as needed)
-        input.step = 0.01; // Step size for fine-tuning floats
+        // Create a range input for other parameters
+        const input = document.createElement("input");
+        input.type = "range";
+        input.id = `param-${key}`;
+
+        // Determine if the parameter is a whole number or a float
+        const isWholeNumber = Number.isInteger(value);
+
+        // Set min, max, and step based on the parameter type
+        if (isWholeNumber) {
+          input.min = 0; // Minimum value for whole numbers
+          input.max = value * 5; // Set max to double the default value (or any other reasonable limit)
+          input.step = 1; // Step size for whole numbers
+        } else {
+          input.min = 0; // Minimum value for floats
+          input.max = 1; // Maximum value for floats (adjust as needed)
+          input.step = 0.01; // Step size for fine-tuning floats
+        }
+
+        input.value = value;
+
+        // Create a span to display the current value
+        const valueDisplay = document.createElement("span");
+        valueDisplay.textContent = `: ${value}`;
+        paramContainer.appendChild(valueDisplay);
+
+        // Update the value display and effect parameter when the slider changes
+        input.addEventListener("input", (event) => {
+          const newValue = parseFloat(event.target.value);
+          valueDisplay.textContent = `: ${
+            isWholeNumber ? newValue : newValue.toFixed(2)
+          }`; // Display value with 2 decimal places for floats
+          this.updateEffectParam(effect, key, newValue);
+        });
+
+        paramContainer.appendChild(input);
       }
-  
-      input.value = value;
-  
-      // Create a span to display the current value
-      const valueDisplay = document.createElement('span');
-      valueDisplay.textContent = `: ${value}`;
-      paramContainer.appendChild(valueDisplay);
-  
-      // Update the value display and effect parameter when the slider changes
-      input.addEventListener('input', (event) => {
-        const newValue = parseFloat(event.target.value);
-        valueDisplay.textContent = `: ${isWholeNumber ? newValue : newValue.toFixed(2)}`; // Display value with 2 decimal places for floats
-        this.updateEffectParam(effect, key, newValue);
-      });
-  
-      paramContainer.appendChild(input);
+
       paramsContainer.appendChild(paramContainer);
     }
   },
@@ -1708,30 +2393,32 @@ AFRAME.registerComponent("post-processing", {
   getEffectParams: function (effect) {
     const effectToSchemaMap = {
       "sketchy-pencil": "sketchyPencilParams", // Ensure this mapping is correct
-      "halftone": "halftoneParams",
+      halftone: "halftoneParams",
       "old-film": "oldFilmParams",
-      "pixel": "pixelParams",
-      "glitch": "glitchParams",
-      "sobel": "sobelParams",
-      "bloom": "bloomParams",
+      pixel: "pixelParams",
+      glitch: "glitchParams",
+      sobel: "sobelParams",
+      bloom: "bloomParams",
       "dot-screen": "dotScreenParams",
       "volumetric-light": "volumetricLightParams",
-      "afterimage": "afterimageParams",
+      afterimage: "afterimageParams",
       "bad-tv": "badTVParams",
+      "custom-outline": "customOutlineParams",
+      moebius: "moebiusParams",
     };
-  
+
     const schemaProperty = effectToSchemaMap[effect];
     if (!schemaProperty) {
       console.error(`No parameters found for effect: ${effect}`);
       return {};
     }
-  
+
     const paramsString = this.data[schemaProperty];
     if (!paramsString) {
       console.error(`Parameters string is undefined for effect: ${effect}`);
       return {};
     }
-  
+
     return this.parseParams(paramsString);
   },
 
@@ -1740,52 +2427,53 @@ AFRAME.registerComponent("post-processing", {
     if (!paramsString || typeof paramsString !== "string") {
       return params;
     }
-  
+
     // Split the string by commas and trim whitespace
-    paramsString.split(',').forEach(param => {
-      const [key, value] = param.split(':').map(s => s.trim());
+    paramsString.split(",").forEach((param) => {
+      const [key, value] = param.split(":").map((s) => s.trim());
       if (key && value && !isNaN(value)) {
         params[key] = parseFloat(value);
       }
     });
-  
+
     return params;
   },
 
   updateEffectParam: function (effect, param, value) {
     const effectToSchemaMap = {
       "sketchy-pencil": "sketchyPencilParams",
-      "halftone": "halftoneParams",
+      halftone: "halftoneParams",
       "old-film": "oldFilmParams",
-      "pixel": "pixelParams",
-      "glitch": "glitchParams",
-      "sobel": "sobelParams",
-      "bloom": "bloomParams",
+      pixel: "pixelParams",
+      glitch: "glitchParams",
+      sobel: "sobelParams",
+      bloom: "bloomParams",
       "dot-screen": "dotScreenParams",
       "volumetric-light": "volumetricLightParams",
-      "afterimage": "afterimageParams",
+      afterimage: "afterimageParams",
       "bad-tv": "badTVParams",
+      "custom-outline": "customOutlineParams",
+      moebius: "moebiusParams",
     };
-  
+
     const schemaProperty = effectToSchemaMap[effect];
     if (!schemaProperty) {
       console.error(`No schema property found for effect: ${effect}`);
       return;
     }
-  
+
     // Get the current parameters for the effect
     const params = this.getEffectParams(effect);
     params[param] = value;
-  
+
     // Update the schema property with the new parameters
     this.data[schemaProperty] = Object.entries(params)
       .map(([key, val]) => `${key}: ${val}`)
-      .join(', ');
-  
+      .join(", ");
+
     // Re-apply the effect with the updated parameters
     this.setupEffect();
   },
-
 
   setupEffect: function () {
     // Clear existing composer if it exists
@@ -1824,7 +2512,11 @@ AFRAME.registerComponent("post-processing", {
       this.composer.addPass(pencilLinesPass);
     } else if (this.data.effect === "halftone") {
       const halftoneParams = getParams(this.data.halftoneParams);
-      const halftonePass = new HalftonePass(window.innerWidth, window.innerHeight, halftoneParams);
+      const halftonePass = new HalftonePass(
+        window.innerWidth,
+        window.innerHeight,
+        halftoneParams
+      );
       this.composer.addPass(halftonePass);
     } else if (this.data.effect === "old-film") {
       const oldFilmParams = getParams(this.data.oldFilmParams);
@@ -1841,7 +2533,12 @@ AFRAME.registerComponent("post-processing", {
       this.composer.addPass(vignettePass);
     } else if (this.data.effect === "pixel") {
       const pixelParams = getParams(this.data.pixelParams);
-      const pixelPass = new RenderPixelatedPass(pixelParams.pixelSize, this.scene, this.camera, pixelParams);
+      const pixelPass = new RenderPixelatedPass(
+        pixelParams.pixelSize,
+        this.scene,
+        this.camera,
+        pixelParams
+      );
       this.composer.addPass(pixelPass);
       const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
       this.composer.addPass(gammaCorrectionPass);
@@ -1857,13 +2554,18 @@ AFRAME.registerComponent("post-processing", {
       const sobelParams = getParams(this.data.sobelParams);
       const sobelPass = new ShaderPass(SobelOperatorShader);
       sobelPass.enabled = sobelParams.enabled;
-      sobelPass.uniforms.resolution.value.x = window.innerWidth * window.devicePixelRatio;
-      sobelPass.uniforms.resolution.value.y = window.innerHeight * window.devicePixelRatio;
+      sobelPass.uniforms.resolution.value.x =
+        window.innerWidth * window.devicePixelRatio;
+      sobelPass.uniforms.resolution.value.y =
+        window.innerHeight * window.devicePixelRatio;
       this.composer.addPass(sobelPass);
     } else if (this.data.effect === "bloom") {
       const bloomParams = getParams(this.data.bloomParams);
       const bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight),
+        new THREE.Vector2(
+          this.renderer.domElement.clientWidth,
+          this.renderer.domElement.clientHeight
+        ),
         1.5,
         0.4,
         0.85
@@ -1898,9 +2600,12 @@ AFRAME.registerComponent("post-processing", {
       const volumetricLightParams = getParams(this.data.volumetricLightParams);
       const volumetricLightPass = new ShaderPass(VolumetericLightShader);
       volumetricLightPass.uniforms.decay.value = volumetricLightParams.decay;
-      volumetricLightPass.uniforms.density.value = volumetricLightParams.density;
-      volumetricLightPass.uniforms.exposure.value = volumetricLightParams.exposure;
-      volumetricLightPass.uniforms.samples.value = volumetricLightParams.samples;
+      volumetricLightPass.uniforms.density.value =
+        volumetricLightParams.density;
+      volumetricLightPass.uniforms.exposure.value =
+        volumetricLightParams.exposure;
+      volumetricLightPass.uniforms.samples.value =
+        volumetricLightParams.samples;
       this.occlusionComposer.addPass(volumetricLightPass);
       this.composer = new EffectComposer(this.renderer);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -1930,7 +2635,12 @@ AFRAME.registerComponent("post-processing", {
       filmPass.uniforms.grayscale.value = 0;
       const staticParams = { show: true, amount: 0.5, size: 4 };
       const rgbShiftParams = { show: true, amount: 0.005, angle: 0 };
-      const filmParams = { show: true, count: 800, sIntensity: 0.9, nIntensity: 0.4 };
+      const filmParams = {
+        show: true,
+        count: 800,
+        sIntensity: 0.9,
+        nIntensity: 0.4,
+      };
       let time = 0;
       const animate = () => {
         time += 0.1;
@@ -1956,6 +2666,49 @@ AFRAME.registerComponent("post-processing", {
       this.composer.addPass(staticPass);
       this.composer.addPass(copyPass);
       animate();
+    } else if (this.data.effect === "custom-outline") {
+      const customOutline = new CustomOutlinePass(
+        new THREE.Vector2(
+          this.renderer.domElement.clientWidth,
+          this.renderer.domElement.clientHeight
+        ),
+        this.scene,
+        this.camera
+      );
+      this.composer.addPass(customOutline);
+      const effectFXAA = new ShaderPass(FXAAShader);
+      effectFXAA.uniforms["resolution"].value.set(
+        1 / this.renderer.domElement.clientWidth,
+        1 / this.renderer.domElement.clientHeight
+      );
+      this.composer.addPass(effectFXAA);
+
+      const outlinePassParams = getParams(this.data.customOutlineParams);
+      const uniforms = customOutline.fsQuad.material.uniforms;
+      uniforms.multiplierParameters.value.x = outlinePassParams.depthBias;
+      uniforms.multiplierParameters.value.y = outlinePassParams.depthMult;
+      uniforms.multiplierParameters.value.z = outlinePassParams.normalBias;
+      uniforms.multiplierParameters.value.w = outlinePassParams.normalMult;
+      uniforms.outlineColor.value.set(outlinePassParams.outlineColor);
+    } else if (this.data.effect === "moebius") {
+      if (
+        document.querySelectorAll("a-entity[gaussian-splatting]").length > 0
+      ) {
+        return;
+      } else if (document.querySelectorAll("[gltf-model]").length > 0) {
+        const pencilLinePass2 = new PencilLinesPass2(
+          this.renderer.domElement.clientWidth,
+          this.renderer.domElement.clientHeight,
+          this.scene,
+          this.camera
+        );
+
+        const gammaCorrectionPass = new ShaderPass(GammaCorrectionShader);
+
+        this.composer.addPass(renderPass);
+        this.composer.addPass(gammaCorrectionPass);
+        this.composer.addPass(pencilLinePass2);
+      }
     }
 
     this.bind();
@@ -1979,5 +2732,4 @@ AFRAME.registerComponent("post-processing", {
       }
     };
   },
-
 });
