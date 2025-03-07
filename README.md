@@ -7,4 +7,5 @@
 - Add possibility to make change of slides based on click event (clicking on a button - left/right - makes camera jump from point A to point B).
 - Add Help menu item explaining how to's.
 - Improve UI and start working on mobile version.
-- Integrate own vologram's component which will allow to load volumetric files as well. 
+- Integrate own vologram's component which will allow to load volumetric files as well.
+- Add code exporting.  
