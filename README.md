@@ -8,5 +8,5 @@
 - Add Help menu item explaining how to's.
 - Improve UI and start working on mobile version.
 - Add code exporting feature (it should export ready to use code which then will be embedded/inserted into a newsroom website easily).
-- Add multiple language support (preferably Spanish, German and French).
+- Add multiple language support (preferably German, French and Spanish).
   
