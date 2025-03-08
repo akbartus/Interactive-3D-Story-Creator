@@ -305,7 +305,7 @@
 
         .text-overlay {
             position: fixed;
-            
+
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.8);
@@ -399,29 +399,31 @@
 
 
 
-.frameNumber, .durationFrames{
-    width: 60px !important;
-    display: inline-block !important;
-} 
+        .frameNumber,
+        .durationFrames {
+            width: 60px !important;
+            display: inline-block !important;
+        }
 
-.delete-slide-button {
-   
-    padding: 5px 10px;
-    background-color: #dc3545 !important;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    width: 100px !important;
-    padding: 8px !important;
-    margin-bottom: 5px;
-    margin-left: auto; /* Push the button to the right */
-}
+        .delete-slide-button {
 
-.delete-slide-button:hover {
-    background-color: #c82333;
-}
+            padding: 5px 10px;
+            background-color: #dc3545 !important;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100px !important;
+            padding: 8px !important;
+            margin-bottom: 5px;
+            margin-left: auto;
+            /* Push the button to the right */
+        }
+
+        .delete-slide-button:hover {
+            background-color: #c82333;
+        }
     </style>
 
     <script>
@@ -710,129 +712,129 @@
 
         AFRAME.registerComponent('scroll-animator', {
             schema: {
-        speed: { type: 'number', default: 1 },
-        direction: { type: 'string', default: 'bottom-to-center' }
-    },
+                speed: { type: 'number', default: 1 },
+                direction: { type: 'string', default: 'bottom-to-center' }
+            },
 
-    init: function () {
-        this.textOverlays = [];
-        this.currentTextIndex = 0;
-        this.textDisplayRange = 10; // Default number of frames for fade-in and fade-out
+            init: function () {
+                this.textOverlays = [];
+                this.currentTextIndex = 0;
+                this.textDisplayRange = 10; // Default number of frames for fade-in and fade-out
 
-        // File input setup
-        const fileInput = document.querySelector("#fileInput2");
-        fileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.animationData = JSON.parse(e.target.result);
-                    this.steps = Object.keys(this.animationData);
-                    this.currentStepIndex = 0;
-                    this.currentIndex = 0;
+                // File input setup
+                const fileInput = document.querySelector("#fileInput2");
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.animationData = JSON.parse(e.target.result);
+                            this.steps = Object.keys(this.animationData);
+                            this.currentStepIndex = 0;
+                            this.currentIndex = 0;
 
-                    // Display total frame count and duration from the loaded JSON
-                    const stepKey = this.steps[0]; // Assuming only one step for simplicity
-                    const frameCount = this.animationData[stepKey].frameCount;
-                    const duration = this.animationData[stepKey].duration;
+                            // Display total frame count and duration from the loaded JSON
+                            const stepKey = this.steps[0]; // Assuming only one step for simplicity
+                            const frameCount = this.animationData[stepKey].frameCount;
+                            const duration = this.animationData[stepKey].duration;
 
-                    // Update the HTML elements
-                    document.querySelector('#frameCount2').textContent = frameCount;
-                    document.querySelector('#duration2').textContent = duration.toFixed(2);
+                            // Update the HTML elements
+                            document.querySelector('#frameCount2').textContent = frameCount;
+                            document.querySelector('#duration2').textContent = duration.toFixed(2);
 
-                    // Update the "This Frame" slider
-                    const frameSlider = document.getElementById('frame-slider');
-                    const frameSliderValue = document.getElementById('frame-slider-value');
-                    if (frameSlider && frameSliderValue) {
-                        frameSlider.max = frameCount - 1; // Set max to total frames - 1
-                        frameSlider.value = 0;
-                        frameSliderValue.textContent = 0;
+                            // Update the "This Frame" slider
+                            const frameSlider = document.getElementById('frame-slider');
+                            const frameSliderValue = document.getElementById('frame-slider-value');
+                            if (frameSlider && frameSliderValue) {
+                                frameSlider.max = frameCount - 1; // Set max to total frames - 1
+                                frameSlider.value = 0;
+                                frameSliderValue.textContent = 0;
+                            }
+
+                            this.setupScrollListener();
+                        };
+                        reader.readAsText(file);
                     }
+                });
 
-                    this.setupScrollListener();
-                };
-                reader.readAsText(file);
-            }
-        });
+                // Slider setup
+                const speedSlider = document.getElementById('speed-slider');
+                const speedValue = document.querySelector('.speed-value');
 
-        // Slider setup
-        const speedSlider = document.getElementById('speed-slider');
-        const speedValue = document.querySelector('.speed-value');
+                if (speedSlider && speedValue) {
+                    // Initialize the displayed speed value
+                    speedValue.textContent = this.data.speed;
 
-        if (speedSlider && speedValue) {
-            // Initialize the displayed speed value
-            speedValue.textContent = this.data.speed;
+                    // Update speed value display and set the speed in the scroll-animator component
+                    speedSlider.addEventListener('input', (event) => {
+                        const speed = parseInt(event.target.value, 10);
+                        speedValue.textContent = speed;
 
-            // Update speed value display and set the speed in the scroll-animator component
-            speedSlider.addEventListener('input', (event) => {
-                const speed = parseInt(event.target.value, 10);
-                speedValue.textContent = speed;
+                        // Update the speed in the scroll-animator component
+                        this.el.setAttribute('scroll-animator', 'speed', speed);
+                    });
+                }
 
-                // Update the speed in the scroll-animator component
-                this.el.setAttribute('scroll-animator', 'speed', speed);
-            });
-        }
+                // Add event listener for the "Add Text" button
+                document.getElementById('add-slide-button').addEventListener('click', () => {
+                    this.addTextInput();
+                });
 
-        // Add event listener for the "Add Text" button
-        document.getElementById('add-slide-button').addEventListener('click', () => {
-            this.addTextInput();
-        });
+                // Add event listener for the "This Frame" slider
+                const frameSlider = document.getElementById('frame-slider');
+                const frameSliderValue = document.getElementById('frame-slider-value');
 
-        // Add event listener for the "This Frame" slider
-        const frameSlider = document.getElementById('frame-slider');
-        const frameSliderValue = document.getElementById('frame-slider-value');
+                if (frameSlider && frameSliderValue) {
+                    frameSlider.addEventListener('input', (event) => {
+                        const frame = parseInt(event.target.value, 10);
+                        frameSliderValue.textContent = frame;
+                        this.jumpToFrame(frame);
+                    });
+                }
 
-        if (frameSlider && frameSliderValue) {
-            frameSlider.addEventListener('input', (event) => {
-                const frame = parseInt(event.target.value, 10);
-                frameSliderValue.textContent = frame;
-                this.jumpToFrame(frame);
-            });
-        }
+                // Add event listener for the direction dropdown
+                const directionSelect = document.getElementById('direction-select');
+                if (directionSelect) {
+                    directionSelect.addEventListener('change', (event) => {
+                        const direction = event.target.value;
+                        this.el.setAttribute('scroll-animator', 'direction', direction);
+                    });
+                }
+            },
 
-        // Add event listener for the direction dropdown
-        const directionSelect = document.getElementById('direction-select');
-        if (directionSelect) {
-            directionSelect.addEventListener('change', (event) => {
-                const direction = event.target.value;
-                this.el.setAttribute('scroll-animator', 'direction', direction);
-            });
-        }
-    },
+            addTextInput: function () {
+                const container = document.querySelector('.text-inputs-container');
+                const slideCount = container.querySelectorAll('.text-input-row').length + 1; // Get the current number of slides and increment by 1
 
-    addTextInput: function () {
-        const container = document.querySelector('.text-inputs-container');
-        const slideCount = container.querySelectorAll('.text-input-row').length + 1; // Get the current number of slides and increment by 1
-
-        const newTextInput = document.createElement('div');
-        newTextInput.className = 'text-input-row';
-        newTextInput.innerHTML = `
+                const newTextInput = document.createElement('div');
+                newTextInput.className = 'text-input-row';
+                newTextInput.innerHTML = `
             <label class="slideTitle">Slide: ${slideCount}</label>
             <input type="text" class="scrollableText" placeholder="Enter text...">
             <input type="number" class="frameNumber" placeholder="Frame number...">
             <input type="number" class="durationFrames" placeholder="Duration in frames..." min="1">
             <button class="delete-slide-button">Delete</button>
         `;
-        container.appendChild(newTextInput);
+                container.appendChild(newTextInput);
 
-        // Add event listener for the delete button
-        const deleteButton = newTextInput.querySelector('.delete-slide-button');
-        deleteButton.addEventListener('click', () => {
-            this.deleteSlide(newTextInput);
-        });
-    },
+                // Add event listener for the delete button
+                const deleteButton = newTextInput.querySelector('.delete-slide-button');
+                deleteButton.addEventListener('click', () => {
+                    this.deleteSlide(newTextInput);
+                });
+            },
 
-    deleteSlide: function (slideElement) {
-        const container = document.querySelector('.text-inputs-container');
-        container.removeChild(slideElement);
+            deleteSlide: function (slideElement) {
+                const container = document.querySelector('.text-inputs-container');
+                container.removeChild(slideElement);
 
-        // Update slide titles after deletion
-        const slides = container.querySelectorAll('.text-input-row');
-        slides.forEach((slide, index) => {
-            const slideTitle = slide.querySelector('.slideTitle');
-            slideTitle.textContent = `Slide: ${index + 1}`;
-        });
-    },
+                // Update slide titles after deletion
+                const slides = container.querySelectorAll('.text-input-row');
+                slides.forEach((slide, index) => {
+                    const slideTitle = slide.querySelector('.slideTitle');
+                    slideTitle.textContent = `Slide: ${index + 1}`;
+                });
+            },
 
 
             setupScrollListener: function () {
@@ -1114,6 +1116,7 @@
 
 
         function togglePanel(panelId) {
+
             const translate = document.getElementById('translateIcon');
             const rotate = document.getElementById('rotateIcon');
             const scale = document.getElementById('scaleIcon');
@@ -1137,6 +1140,7 @@
                 if (panelId === "camera-panel") {
                     cameras[1].setAttribute('camera', 'active', 'false');
                     cameras[0].setAttribute('camera', 'active', 'true');
+
 
                     translate.style.display = "none";
                     rotate.style.display = "none";
@@ -1271,9 +1275,10 @@
                                     }
                                 }
                             });
+                            window.setTimeout(() => {
+                                new Editor();
+                            }, 100);
 
-                            // Log the URL for debugging
-                            console.log('Loading .splat file:', url);
                         } else {
                             // Create a new GLTF model entity
                             const model = document.createElement('a-entity');
@@ -1283,14 +1288,17 @@
 
                             // Add the model to the scene
                             document.querySelector("a-scene").appendChild(model);
+                            model.addEventListener('model-loaded', function (event) {
+
+                                window.setTimeout(() => {
+                                    new Editor();
+                                }, 100);
+                            });
                         }
 
-                        // Interaction handling
 
-                        window.setTimeout(() => {
-                            new Editor();
-                        }, 100);
-                    });
+                    })
+
                 }
             });
 
@@ -1309,6 +1317,25 @@
                     entity.setAttribute("wasd-controls", "fly", true); // Enable fly mode
                 }
             });
+
+            const gridEnableButton = document.getElementById('gridEnable');
+            const gridDisableButton = document.getElementById('gridDisable');
+            let gridElement = document.querySelector("a-grid");
+            gridEnableButton.addEventListener("click", function () {
+                if (!gridElement) {
+                    gridElement = document.createElement('a-grid');
+                    gridElement.setAttribute('position', '0 -0.1 0');
+                    document.querySelector('a-scene').appendChild(gridElement);
+                }
+            });
+
+            gridDisableButton.addEventListener("click", function () {
+                if (gridElement) {
+                    document.querySelector('a-scene').removeChild(gridElement);
+                    gridElement = null;
+                }
+            });
+
 
             document.getElementById('effect-select').addEventListener('change', function () {
                 const selectedEffect = this.value;
@@ -1338,7 +1365,7 @@
 
             // Add event listener for preloadGS button
             document.getElementById('preloadGS').addEventListener('click', function () {
-                const url = 'model.splat'; // Update this path to the correct location of plush.splat
+                const url = 'truck.splat'; // Update this path to the correct location of plush.splat
 
                 // Create a new Gaussian Splatting entity
                 const splatEntity = document.createElement('a-entity');
@@ -1405,24 +1432,29 @@
             });
 
             document.getElementById('preloadGLTF').addEventListener('click', function () {
-                const url = 'forest-house.glb';
+                const url = 'antiquecamera.glb';
 
                 // Create a new GLTF model entity
                 const model = document.createElement('a-entity');
                 model.setAttribute('gltf-model', `url(${url})`);
-                model.setAttribute('scale', '1 1 1');
+                model.setAttribute('scale', '0.5 0.5 0.5');
+
 
                 // Add the model to the scene
                 document.querySelector("a-scene").appendChild(model);
 
                 // Log the URL for debugging
                 console.log('Loading .gltf file:', url);
+                model.addEventListener('model-loaded', function (event) {
+                    window.setTimeout(() => {
+                        new Editor();
+                    }, 100);
+                })
 
 
-                window.setTimeout(() => {
-                    new Editor();
-                }, 100);
+
             });
+
         });
 
 
@@ -1495,6 +1527,18 @@
 
 <body>
     <div class="controls-container">
+        <!-- Grid icons -->
+        <div class="transform-controls">
+            <div id="gridEnable" class="transform-icon" title="Enable Grid">
+                <img src="icons/grid-enable.png">
+            </div>
+        </div>
+        <!-- Grid Disable Button -->
+        <div class="transform-controls">
+            <div id="gridDisable" class="transform-icon" title="Disable Grid">
+                <img src="icons/grid-disable.png">
+            </div>
+        </div>
         <!-- WASD Icon -->
         <div class="transform-controls">
             <div id="wasd" class="transform-icon" title="WASD">
