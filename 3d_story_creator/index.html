@@ -1432,12 +1432,12 @@
             });
 
             document.getElementById('preloadGLTF').addEventListener('click', function () {
-                const url = 'antiquecamera.glb';
+                const url = 'foresthouse.glb';
 
                 // Create a new GLTF model entity
                 const model = document.createElement('a-entity');
                 model.setAttribute('gltf-model', `url(${url})`);
-                model.setAttribute('scale', '0.5 0.5 0.5');
+                model.setAttribute('scale', '1 1 1');
 
 
                 // Add the model to the scene
