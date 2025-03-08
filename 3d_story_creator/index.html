@@ -271,9 +271,12 @@
         }
 
 
+
         #gltf-loader {
             z-index: 9999;
         }
+
+
 
         #fly,
         #wasd {
@@ -423,6 +426,63 @@
 
         .delete-slide-button:hover {
             background-color: #c82333;
+        }
+
+
+        /* File Input styles */
+
+        input[type="file"] {
+            position: relative;
+        }
+
+        input[type="file"]::file-selector-button {
+            width: 136px;
+            color: transparent;
+        }
+
+        /* Faked label styles and icon */
+        input[type="file"]::before {
+            position: absolute;
+            pointer-events: none;
+            top: 10px;
+            left: 16px;
+            height: 20px;
+            width: 20px;
+            content: "";
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230964B0'%3E%3Cpath d='M18 15v3H6v-3H4v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2zM7 9l1.41 1.41L11 7.83V16h2V7.83l2.59 2.58L17 9l-5-5-5 5z'/%3E%3C/svg%3E");
+            margin-top: 5px;
+        }
+
+        input[type="file"]::after {
+            position: absolute;
+            pointer-events: none;
+            top: 11px;
+            left: 40px;
+            color: #0964b0;
+            content: "Upload File";
+            margin-top: 8px
+        }
+
+        input[type="file"]::file-selector-button {
+            border-radius: 4px;
+            padding: 0 16px;
+            height: 40px;
+            cursor: pointer;
+            background-color: white;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            box-shadow: 0px 1px 0px rgba(0, 0, 0, 0.05);
+            margin-right: 16px;
+            transition: background-color 200ms;
+        }
+
+        /* file upload button hover state */
+        input[type="file"]::file-selector-button:hover {
+            background-color: #f3f4f6;
+        }
+
+        /* file upload button active state */
+        input[type="file"]::file-selector-button:active {
+            background-color: #e5e7eb;
         }
     </style>
 
@@ -1455,6 +1515,40 @@
 
             });
 
+
+            document.getElementById("backgroundChange").addEventListener("click", function () {
+                let colorPicker = document.getElementById("colorPicker");
+
+                if (!colorPicker) {
+                    colorPicker = document.createElement("input");
+                    colorPicker.type = "color";
+                    colorPicker.id = "colorPicker";
+                    colorPicker.style.position = "absolute";
+                    colorPicker.style.top = "50px"; // Adjust position as needed
+                    colorPicker.style.right = "50px"; // Position to the right of the screen
+                    colorPicker.style.opacity = "0"; // Hide the input
+                    colorPicker.style.pointerEvents = "none"; // Prevent interaction
+                    document.body.appendChild(colorPicker);
+                }
+
+                setTimeout(() => {
+                    colorPicker.click();
+                }, 10);
+
+                colorPicker.addEventListener("input", function () {
+                    let sky = document.querySelector("a-sky");
+                    if (sky) {
+                        sky.setAttribute("color", colorPicker.value);
+                    }
+                });
+            });
+
+
+
+
+
+
+
         });
 
 
@@ -1527,13 +1621,18 @@
 
 <body>
     <div class="controls-container">
+        <div class="transform-controls">
+            <div id="backgroundChange" class="transform-icon" title="Change Background">
+                <img src="icons/background.png">
+            </div>
+        </div>
         <!-- Grid icons -->
         <div class="transform-controls">
             <div id="gridEnable" class="transform-icon" title="Enable Grid">
                 <img src="icons/grid-enable.png">
             </div>
         </div>
-        <!-- Grid Disable Button -->
+
         <div class="transform-controls">
             <div id="gridDisable" class="transform-icon" title="Disable Grid">
                 <img src="icons/grid-disable.png">
@@ -1581,7 +1680,7 @@
 
     <!-- Tooltip panel -->
     <div id="3d-panel" class="panel">
-        <h2>Upload 3D File</h2>
+        <h3>Upload 3D File</h3>
         <label>Upload .splat, .gltf or .glb files</label>
         <input type="file" id="gltf-loader" accept=".gltf,.glb,.splat" multiple>
         <button id="preloadGS">Load sample Gaussian Splat file.</button>
@@ -1591,7 +1690,7 @@
     </div>
 
     <div id="tooltip-panel" class="panel">
-        <h2>Create Tooltip</h2>
+        <h3>Create Tooltip</h3>
         <label>Tooltip text: </label>
         <textarea id="tooltip-input" placeholder="Tooltip text..." rows="4" cols="50"></textarea>
         <div id="align-input" class="align-icons">
@@ -1672,7 +1771,7 @@
 
 
         <div id="testAnimation">
-            <h2>Test Camera Animation</h2>
+            <h3>Test Camera Animation</h3>
             <input type="file" id="fileInput" accept="application/json">
         </div>
     </div>
@@ -1767,7 +1866,8 @@
 
     <!-- Scroll panel -->
     <div id="export-panel" class="panel">
-        <h2>Export</h2>
+        <h3>Export options</h3>
+
 
     </div>
 
@@ -1777,7 +1877,7 @@
         <a-entity camera-movement-recorder camera-movement-animator scroll-animator wasd-controls="acceleration:10"
             look-controls camera tooltip-component position="5.132 1.6 7.237"></a-entity>
         <a-grid position="0 -0.1 0"></a-grid>
-
+        <a-sky></a-sky>
     </a-scene>
 </body>
 
