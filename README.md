@@ -7,6 +7,7 @@
 - Add possibility to make change of slides based on click event (clicking on a button - left/right - makes camera jump from point A to point B).
 - Add Help menu item explaining how to's.
 - Improve UI and start working on mobile version.
-- Add code exporting feature (it should export ready to use code which then will be embedded/inserted into a newsroom website easily).
+- Add improved code exporting feature.
 - Add multiple language support (preferably German, French and Spanish).
+- Replace png icons with svg icons and add cdn url addresses so that scrolytelling exported remains standalone.  
   
