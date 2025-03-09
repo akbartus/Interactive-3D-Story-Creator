@@ -21,7 +21,9 @@ AFRAME.registerComponent("gaussian-splatting", {
       );
     }
 
-    document.querySelector("a-scene").addEventListener("loaded", () => {
+    // document.querySelector("a-scene").addEventListener("loaded", () => {
+    // Small hack by Kfarr: https://github.com/quadjr/aframe-gaussian-splatting/issues/21
+    setTimeout(() => {
       this.loadData(
         this.el.sceneEl.camera.el.components.camera.camera,
         this.el.object3D,
@@ -31,7 +33,8 @@ AFRAME.registerComponent("gaussian-splatting", {
       if (!!this.data.cutoutEntity) {
         this.cutout = this.data.cutoutEntity.object3D;
       }
-    });
+    }, 1000);
+    //});
   },
   update: function (oldData) {
     // Check if the src attribute has changed
@@ -44,6 +47,13 @@ AFRAME.registerComponent("gaussian-splatting", {
     if (oldData.displayRadius !== this.data.displayRadius) {
       this.setDisplayRadius(this.data.displayRadius);
     }
+    const cameraEl = this.el.sceneEl?.camera?.el;
+
+    //   if (!cameraEl || !cameraEl.components.camera) {
+    // console.warn("Camera not yet initialized.");
+    // return;
+    //   }
+
     if (oldData.src !== this.data.src) {
       this.loadData(
         this.el.sceneEl.camera.el.components.camera.camera,
@@ -312,8 +322,28 @@ void main () {
     mesh.frustumCulled = false;
     this.object.add(mesh);
 
+    // this.worker.onmessage = (e) => {
+    //   let indexes = new Uint32Array(e.data.sortedIndexes);
+
+    //   mesh.geometry.attributes.splatIndex.set(indexes);
+    //   mesh.geometry.attributes.splatIndex.needsUpdate = true;
+    //   mesh.geometry.instanceCount = indexes.length;
+    //   this.sortReady = true;
+    // };
+
     this.worker.onmessage = (e) => {
       let indexes = new Uint32Array(e.data.sortedIndexes);
+
+      // Check if the length of indexes exceeds the length of splatIndex
+      if (indexes.length > mesh.geometry.attributes.splatIndex.array.length) {
+        // Resize the splatIndex array to accommodate the new indexes
+        const newSplatIndexArray = new Uint32Array(indexes.length);
+        mesh.geometry.attributes.splatIndex =
+          new THREE.InstancedBufferAttribute(newSplatIndexArray, 1, false);
+        mesh.geometry.attributes.splatIndex.setUsage(THREE.DynamicDrawUsage);
+      }
+
+      // Set the new indexes
       mesh.geometry.attributes.splatIndex.set(indexes);
       mesh.geometry.attributes.splatIndex.needsUpdate = true;
       mesh.geometry.instanceCount = indexes.length;

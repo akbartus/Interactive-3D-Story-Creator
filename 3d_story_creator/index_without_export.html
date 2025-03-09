@@ -53,6 +53,7 @@
             /* Initially hidden */
         }
 
+
         .panel input,
         textarea,
         .panel select {
@@ -691,9 +692,6 @@
                             this.currentStepIndex = 0;
                             this.currentIndex = 0;
 
-                            // Embed the JSON data in the HTML
-
-
                             // Display total frame count and duration from the loaded JSON
                             const stepKey = this.steps[0]; // Assuming only one step for simplicity
                             const frameCount = this.animationData[stepKey].frameCount;
@@ -770,6 +768,8 @@
         });
 
 
+
+
         AFRAME.registerComponent('scroll-animator', {
             schema: {
                 speed: { type: 'number', default: 1 },
@@ -781,90 +781,37 @@
                 this.currentTextIndex = 0;
                 this.textDisplayRange = 10; // Default number of frames for fade-in and fade-out
 
-                // Check for embedded JSON data
-                const embeddedJson = document.getElementById('embedded-json-scroll');
-                if (embeddedJson && embeddedJson.textContent.trim()) {
-                    try {
-                        // Attempt to parse the JSON
-                        this.animationData = JSON.parse(embeddedJson.textContent);
-                        this.steps = Object.keys(this.animationData);
-                        this.currentStepIndex = 0;
-                        this.currentIndex = 0;
-
-                        // Display total frame count and duration from the embedded JSON
-                        const stepKey = this.steps[0]; // Assuming only one step for simplicity
-                        const frameCount = this.animationData[stepKey].frameCount;
-                        const duration = this.animationData[stepKey].duration;
-
-                        // Update the HTML elements
-                        document.querySelector('#frameCount2').textContent = frameCount;
-                        document.querySelector('#duration2').textContent = duration.toFixed(2);
-
-                        // Update the "This Frame" slider
-                        const frameSlider = document.getElementById('frame-slider');
-                        const frameSliderValue = document.getElementById('frame-slider-value');
-                        if (frameSlider && frameSliderValue) {
-                            frameSlider.max = frameCount - 1; // Set max to total frames - 1
-                            frameSlider.value = 0;
-                            frameSliderValue.textContent = 0;
-                        }
-
-                        this.setupScrollListener();
-                    } catch (error) {
-                        console.error("Failed to parse embedded JSON:", error);
-                        // Provide a fallback or default value
-                        this.animationData = {}; // Default empty object
-                        this.steps = [];
-                        this.currentStepIndex = 0;
-                        this.currentIndex = 0;
-                    }
-                } else {
-                    // If no embedded JSON is found or it's empty, initialize with default values
-                    this.animationData = {}; // Default empty object
-                    this.steps = [];
-                    this.currentStepIndex = 0;
-                    this.currentIndex = 0;
-                }
-
-                // File input setup (for initial loading)
+                // File input setup
                 const fileInput = document.querySelector("#fileInput2");
                 fileInput.addEventListener('change', (event) => {
                     const file = event.target.files[0];
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            try {
-                                this.animationData = JSON.parse(e.target.result);
-                                this.steps = Object.keys(this.animationData);
-                                this.currentStepIndex = 0;
-                                this.currentIndex = 0;
+                            this.animationData = JSON.parse(e.target.result);
+                            this.steps = Object.keys(this.animationData);
+                            this.currentStepIndex = 0;
+                            this.currentIndex = 0;
 
-                                // Embed the JSON data in the HTML
-                                const embeddedJson = document.getElementById('embedded-json-scroll');
-                                embeddedJson.textContent = JSON.stringify(this.animationData);
+                            // Display total frame count and duration from the loaded JSON
+                            const stepKey = this.steps[0]; // Assuming only one step for simplicity
+                            const frameCount = this.animationData[stepKey].frameCount;
+                            const duration = this.animationData[stepKey].duration;
 
-                                // Display total frame count and duration from the loaded JSON
-                                const stepKey = this.steps[0]; // Assuming only one step for simplicity
-                                const frameCount = this.animationData[stepKey].frameCount;
-                                const duration = this.animationData[stepKey].duration;
+                            // Update the HTML elements
+                            document.querySelector('#frameCount2').textContent = frameCount;
+                            document.querySelector('#duration2').textContent = duration.toFixed(2);
 
-                                // Update the HTML elements
-                                document.querySelector('#frameCount2').textContent = frameCount;
-                                document.querySelector('#duration2').textContent = duration.toFixed(2);
-
-                                // Update the "This Frame" slider
-                                const frameSlider = document.getElementById('frame-slider');
-                                const frameSliderValue = document.getElementById('frame-slider-value');
-                                if (frameSlider && frameSliderValue) {
-                                    frameSlider.max = frameCount - 1; // Set max to total frames - 1
-                                    frameSlider.value = 0;
-                                    frameSliderValue.textContent = 0;
-                                }
-
-                                this.setupScrollListener();
-                            } catch (error) {
-                                console.error("Failed to parse JSON file:", error);
+                            // Update the "This Frame" slider
+                            const frameSlider = document.getElementById('frame-slider');
+                            const frameSliderValue = document.getElementById('frame-slider-value');
+                            if (frameSlider && frameSliderValue) {
+                                frameSlider.max = frameCount - 1; // Set max to total frames - 1
+                                frameSlider.value = 0;
+                                frameSliderValue.textContent = 0;
                             }
+
+                            this.setupScrollListener();
                         };
                         reader.readAsText(file);
                     }
@@ -914,6 +861,7 @@
                     });
                 }
             },
+
             addTextInput: function () {
                 const container = document.querySelector('.text-inputs-container');
                 const slideCount = container.querySelectorAll('.text-input-row').length + 1; // Get the current number of slides and increment by 1
@@ -947,6 +895,7 @@
                     slideTitle.textContent = `Slide: ${index + 1}`;
                 });
             },
+
 
             setupScrollListener: function () {
                 if (!this.animationData || this.steps.length === 0) return;
@@ -1139,6 +1088,26 @@
                 }
             },
 
+            calculateEndPosition: function (progress) {
+                const direction = this.data.direction;
+                switch (direction) {
+                    case 'bottom-to-center':
+                        // Adjust if you want to move upward (e.g., from bottom to center then to top)
+                        return { left: '50%', top: `${50 - (progress * 50)}%`, transform: 'translate(-50%, -50%)' };
+                    case 'left-to-center':
+                        // Change subtraction to addition so text moves from center to right
+                        return { left: `${50 + (progress * 50)}%`, top: '50%', transform: 'translate(-50%, -50%)' };
+                    case 'right-to-center':
+                        // For symmetry, move from center to left if desired:
+                        return { left: `${50 - (progress * 50)}%`, top: '50%', transform: 'translate(-50%, -50%)' };
+                    case 'top-to-center':
+                        // Adjust for top-to-center (e.g., from top to center then to bottom)
+                        return { left: '50%', top: `${50 + (progress * 50)}%`, transform: 'translate(-50%, -50%)' };
+                    default:
+                        return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
+                }
+            },
+
             showTextOverlay: function (text, progress) {
                 let textOverlay = document.querySelector('.text-overlay');
                 if (!textOverlay) {
@@ -1191,25 +1160,8 @@
                         return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
                 }
             },
-              calculateEndPosition: function (progress) {
-                const direction = this.data.direction;
-                switch (direction) {
-                    case 'bottom-to-center':
-                        // Adjust if you want to move upward (e.g., from bottom to center then to top)
-                        return { left: '50%', top: `${50 - (progress * 50)}%`, transform: 'translate(-50%, -50%)' };
-                    case 'left-to-center':
-                        // Change subtraction to addition so text moves from center to right
-                        return { left: `${50 + (progress * 50)}%`, top: '50%', transform: 'translate(-50%, -50%)' };
-                    case 'right-to-center':
-                        // For symmetry, move from center to left if desired:
-                        return { left: `${50 - (progress * 50)}%`, top: '50%', transform: 'translate(-50%, -50%)' };
-                    case 'top-to-center':
-                        // Adjust for top-to-center (e.g., from top to center then to bottom)
-                        return { left: '50%', top: `${50 + (progress * 50)}%`, transform: 'translate(-50%, -50%)' };
-                    default:
-                        return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
-                }
-            },
+
+
             hideTextOverlay: function () {
                 const textOverlay = document.querySelector('.text-overlay');
                 if (textOverlay) {
@@ -1220,6 +1172,8 @@
                 }
             }
         });
+
+
 
         function togglePanel(panelId) {
 
@@ -1530,6 +1484,8 @@
                 // Log the URL for debugging
                 console.log('Loading .splat file:', url);
 
+
+
                 window.setTimeout(() => {
                     new Editor();
                 }, 100);
@@ -1660,293 +1616,261 @@
                 console.error('One or more elements not found in the DOM.');
             }
         });
-
-        function downloadHTML() {
-            const scene = document.querySelector('a-scene');
-            scene.flushToDOM(true);
-            const sceneContent = scene.innerHTML;
-
-            // Get the embedded JSON data for both animators
-            document.getElementById("main-scene").style.display = "none";
-            const embeddedJsonScroll = document.getElementById('embedded-json-scroll').textContent;
-
-            // Create a Blob with the HTML content
-            const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
-
-            // Create a link element
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'scene.html';
-
-            // Append the link to the body (required for Firefox)
-            document.body.appendChild(link);
-
-            // Programmatically click the link to trigger the download
-            link.click();
-
-            // Remove the link from the document
-            document.body.removeChild(link);
-            document.getElementById("main-scene").style.display = "block";
-        }
     </script>
-    <!-- Save imported json for exporting  -->
-    <script id="embedded-json-scroll" type="application/json">
-</script>
 </head>
 
 <body>
-    <div id="main-scene">
-        <div class="controls-container">
-            <div class="transform-controls">
-                <div id="backgroundChange" class="transform-icon" title="Change Background">
-                    <img src="icons/background.png">
-                </div>
+    <div class="controls-container">
+        <div class="transform-controls">
+            <div id="backgroundChange" class="transform-icon" title="Change Background">
+                <img src="icons/background.png">
             </div>
-            <!-- Grid icons -->
-            <div class="transform-controls">
-                <div id="gridEnable" class="transform-icon" title="Enable Grid">
-                    <img src="icons/grid-enable.png">
-                </div>
-            </div>
-
-            <div class="transform-controls">
-                <div id="gridDisable" class="transform-icon" title="Disable Grid">
-                    <img src="icons/grid-disable.png">
-                </div>
-            </div>
-            <!-- WASD Icon -->
-            <div class="transform-controls">
-                <div id="wasd" class="transform-icon" title="WASD">
-                    <img src="icons/wasd.png">
-                </div>
-            </div>
-
-            <!-- Fly Icon -->
-            <div id="fly" class="transform-icon" title="Fly">
-                <img src="icons/fly.png">
-            </div>
-
-            <!-- Transform Controls -->
-            <div class="transform-controls">
-                <div id="translateIcon" class="transform-icon" title="Translate">
-                    <img src="icons/transform.png">
-                </div>
-                <div id="rotateIcon" class="transform-icon" title="Rotate">
-                    <img src="icons/rotate.png">
-                </div>
-                <div id="scaleIcon" class="transform-icon" title="Scale">
-                    <img src="icons/scale.png">
-                </div>
+        </div>
+        <!-- Grid icons -->
+        <div class="transform-controls">
+            <div id="gridEnable" class="transform-icon" title="Enable Grid">
+                <img src="icons/grid-enable.png">
             </div>
         </div>
 
-
-        <!-- Buttons container -->
-        <div id="buttons-container">
-            <button onclick="togglePanel('3d-panel')">3D Creator</button>
-            <button onclick="togglePanel('tooltip-panel')">Tooltip Creator</button>
-            <button onclick="togglePanel('camera-panel')">Camera Recorder</button>
-            <button onclick="togglePanel('scroll-panel')">Scrollytelling</button>
-            <button onclick="togglePanel('effects-panel')">Effects</button>
-            <button onclick="togglePanel('export-panel')">Export</button>
-
+        <div class="transform-controls">
+            <div id="gridDisable" class="transform-icon" title="Disable Grid">
+                <img src="icons/grid-disable.png">
+            </div>
         </div>
-
-
-
-        <!-- Tooltip panel -->
-        <div id="3d-panel" class="panel">
-            <h3>Upload 3D File</h3>
-            <label>Upload .splat, .gltf or .glb files</label>
-            <input type="file" id="gltf-loader" accept=".gltf,.glb,.splat" multiple>
-            <button id="preloadGS">Load sample Gaussian Splat file.</button>
-            <button id="preloadGLTF">Load sample GLTF file.</button>
-
-
-        </div>
-
-        <div id="tooltip-panel" class="panel">
-            <h3>Create Tooltip</h3>
-            <label>Tooltip text: </label>
-            <textarea id="tooltip-input" placeholder="Tooltip text..." rows="4" cols="50"></textarea>
-            <div id="align-input" class="align-icons">
-                <div class="align-icon" data-value="left" title="Left Align">
-                    <img src="icons/left-align.png" alt="Left Align">
-                </div>
-                <div class="align-icon" data-value="center" title="Center Align">
-                    <img src="icons/center-align.png" alt="Center Align">
-                </div>
-                <div class="align-icon" data-value="right" title="Right Align">
-                    <img src="icons/right-align.png" alt="Right Align">
-                </div>
-                <div class="align-icon" data-value="justify" title="Justify Align">
-                    <img src="icons/justify-align.png" alt="Justify Align">
-                </div>
-                <div class="align-icon">
-                    <img src="icons/color.png" alt="Color Picker" id="color-picker-icon">
-                    <input type="color" id="color-input" style="display: none;">
-                </div>
-            </div>
-            <div id="font-other">
-                <div class="input-group">
-                    <label>Size:</label>
-                    <input type="number" id="font-size-input" placeholder="Size..." step="0.1" min="0" max="10">
-                </div>
-                <div class="input-group">
-                    <label>Height:</label>
-                    <input type="number" id="line-height-input" placeholder="Height...">
-                </div>
-                <div class="input-group">
-                    <label>Spacing:</label>
-                    <input type="number" id="letter-spacing-input" placeholder="Spacing..." step="0.1" min="0" max="10">
-                </div>
-            </div>
-            <div id="font-other2">
-                <div class="input-group">
-                    <label>Opacity:</label>
-                    <input type="number" id="fill-opacity-input" placeholder="Opacity..." step="0.1" min="0" max="1">
-                </div>
-                <div class="input-group">
-                    <label>Max width:</label>
-                    <input type="number" id="max-width-input" placeholder="Max width..." step="0.1" min="0" max="5">
-                </div>
-            </div>
-
-            <label>Custom font URL: </label>
-            <input type="text" id="font-input" placeholder="Custom font URL...">
-
-            <br>
-            <div class="button-container">
-                <button id="submit-tooltip">Create</button>
-                <button id="deleteButton">Delete</button>
+        <!-- WASD Icon -->
+        <div class="transform-controls">
+            <div id="wasd" class="transform-icon" title="WASD">
+                <img src="icons/wasd.png">
             </div>
         </div>
 
-        <!-- Camera panel -->
-        <div id="camera-panel" class="panel">
-            <h3>Camera Animation Options</h3>
-            <!-- Display frame count and duration -->
-            <div>
-                <p>Current Frame: <span id="currentFrame">0</span></p>
-                <p>Total Frames: <span id="frameCount">0</span></p>
-                <p>Duration: <span id="duration">0.00</span> seconds</p>
-
-            </div>
-
-            <label for="camera-speed">Camera Speed:</label>
-            <span id="camera-speed-value">10</span>
-            <input type="range" id="camera-speed" min="1" max="100" value="10">
-
-
-
-            <button id="startButton">Start Recording</button>
-            <button id="endButton">End Recording</button>
-            <button id="downloadButton">Download Camera Data</button>
-
-
-
-
-            <div id="testAnimation">
-                <h3>Test Camera Animation</h3>
-                <input type="file" id="fileInput" accept="application/json">
-            </div>
+        <!-- Fly Icon -->
+        <div id="fly" class="transform-icon" title="Fly">
+            <img src="icons/fly.png">
         </div>
 
-        <!-- Scroll panel -->
-        <div id="scroll-panel" class="panel">
-            <h3>Scrollytelling Options</h3>
-            <label>Load generated JSON file: </label>
-            <input type="file" id="fileInput2" accept="application/json">
-            <br>
-
-
-
-            <!-- Display current frame, total frames, and duration -->
-            <div>
-                <p>Current Frame: <span id="currentFrame2">0</span></p>
-                <p>Total Frames: <span id="frameCount2">0</span></p>
-                <p>Duration: <span id="duration2">0.00</span> seconds</p>
+        <!-- Transform Controls -->
+        <div class="transform-controls">
+            <div id="translateIcon" class="transform-icon" title="Translate">
+                <img src="icons/transform.png">
             </div>
-
-            <label for="speed-slider">Animation Speed:</label>
-            <span class="speed-value">1</span>
-            <input type="range" id="speed-slider" min="1" max="50" value="1">
-
-
-
-            <!-- Add "This Frame" slider -->
-            <label>Frames Slider:</label>
-            <span id="frame-slider-value">0</span>
-            <input type="range" id="frame-slider" min="0" max="0" value="0">
-
-            <h3>Sliding Text Options</h3>
-            <label>Direction of text:</label>
-            <select id="direction-select">
-                <option value="bottom-to-center">Bottom to Top</option>
-                <option value="left-to-center">Left to Right</option>
-                <option value="right-to-center">Right to Left</option>
-                <option value="top-to-center">Top to Bottom</option>
-            </select>
-            <div class="text-inputs-container">
-                <div class="text-input-row">
-                    <label class="slideTitle">Slide 1:</label>
-                    <input type="text" class="scrollableText" placeholder="Enter text...">
-                    <input type="number" class="frameNumber" placeholder="Frame number for text appearance...">
-                    <input type="number" class="durationFrames" placeholder="Duration in frames..." min="1">
-                    <button class="delete-slide-button">Delete</button>
-                </div>
+            <div id="rotateIcon" class="transform-icon" title="Rotate">
+                <img src="icons/rotate.png">
             </div>
-            <button id="add-slide-button">Add Slide</button>
-        </div>
-
-        <div id="effects-panel" class="panel">
-            <h3>Post-Processing Effects</h3>
-            <label for="effect-select">Choose post-processing effect:</label>
-            <select id="effect-select">
-                <option value="none">None</option>
-                <option value="sketchy-pencil">Sketchy Pencil</option>
-                <option value="halftone">Halftone</option>
-                <option value="old-film">Old Film</option>
-                <option value="pixel">Pixel</option>
-                <option value="glitch">Glitch</option>
-                <option value="sobel">Sobel</option>
-                <option value="bloom">Bloom</option>
-                <option value="dot-screen">Dot Screen</option>
-                <option value="volumetric-light">Volumetric Light</option>
-                <option value="afterimage">Afterimage</option>
-                <option value="bad-tv">Bad TV</option>
-                <option value="custom-outline">Custom Outline</option>
-                <option value="moebius">Moebius</option>
-            </select>
-
-            <div id="effect-params"></div>
-
-            <h3>Gaussian Splat Effects</h3>
-            <!-- Dropdown for Color Effect -->
-            <label for="colorEffect">Color Effect:</label>
-            <select id="colorEffect">
-                <option value="0">Normal</option>
-                <option value="1">Grayscale</option>
-                <option value="2">Single Color + White</option>
-            </select>
-
-            <!-- Color Picker for Single Color -->
-            <label for="singleColor">Single Color:</label>
-            <input type="color" id="singleColor" value="#FF0000">
-
-            <!-- Range Input for Display Radius -->
-            <label for="displayRadius">Display Radius:</label>
-            <input type="range" id="displayRadius" min="0.1" max="10.0" step="0.1" value="1.0">
-            <span id="displayRadiusValue">1.0</span>
-        </div>
-
-        <!-- Scroll panel -->
-        <div id="export-panel" class="panel">
-            <h3>Export options</h3>
-            <button onclick="downloadHTML()">Download HTML</button>
-
+            <div id="scaleIcon" class="transform-icon" title="Scale">
+                <img src="icons/scale.png">
+            </div>
         </div>
     </div>
+
+
+    <!-- Buttons container -->
+    <div id="buttons-container">
+        <button onclick="togglePanel('3d-panel')">3D Creator</button>
+        <button onclick="togglePanel('tooltip-panel')">Tooltip Creator</button>
+        <button onclick="togglePanel('camera-panel')">Camera Recorder</button>
+        <button onclick="togglePanel('scroll-panel')">Scrollytelling</button>
+        <button onclick="togglePanel('effects-panel')">Effects</button>
+        <button onclick="togglePanel('export-panel')">Export</button>
+
+    </div>
+
+
+
+    <!-- Tooltip panel -->
+    <div id="3d-panel" class="panel">
+        <h3>Upload 3D File</h3>
+        <label>Upload .splat, .gltf or .glb files</label>
+        <input type="file" id="gltf-loader" accept=".gltf,.glb,.splat" multiple>
+        <button id="preloadGS">Load sample Gaussian Splat file.</button>
+        <button id="preloadGLTF">Load sample GLTF file.</button>
+
+
+    </div>
+
+    <div id="tooltip-panel" class="panel">
+        <h3>Create Tooltip</h3>
+        <label>Tooltip text: </label>
+        <textarea id="tooltip-input" placeholder="Tooltip text..." rows="4" cols="50"></textarea>
+        <div id="align-input" class="align-icons">
+            <div class="align-icon" data-value="left" title="Left Align">
+                <img src="icons/left-align.png" alt="Left Align">
+            </div>
+            <div class="align-icon" data-value="center" title="Center Align">
+                <img src="icons/center-align.png" alt="Center Align">
+            </div>
+            <div class="align-icon" data-value="right" title="Right Align">
+                <img src="icons/right-align.png" alt="Right Align">
+            </div>
+            <div class="align-icon" data-value="justify" title="Justify Align">
+                <img src="icons/justify-align.png" alt="Justify Align">
+            </div>
+            <div class="align-icon">
+                <img src="icons/color.png" alt="Color Picker" id="color-picker-icon">
+                <input type="color" id="color-input" style="display: none;">
+            </div>
+        </div>
+        <div id="font-other">
+            <div class="input-group">
+                <label>Size:</label>
+                <input type="number" id="font-size-input" placeholder="Size..." step="0.1" min="0" max="10">
+            </div>
+            <div class="input-group">
+                <label>Height:</label>
+                <input type="number" id="line-height-input" placeholder="Height...">
+            </div>
+            <div class="input-group">
+                <label>Spacing:</label>
+                <input type="number" id="letter-spacing-input" placeholder="Spacing..." step="0.1" min="0" max="10">
+            </div>
+        </div>
+        <div id="font-other2">
+            <div class="input-group">
+                <label>Opacity:</label>
+                <input type="number" id="fill-opacity-input" placeholder="Opacity..." step="0.1" min="0" max="1">
+            </div>
+            <div class="input-group">
+                <label>Max width:</label>
+                <input type="number" id="max-width-input" placeholder="Max width..." step="0.1" min="0" max="5">
+            </div>
+        </div>
+
+        <label>Custom font URL: </label>
+        <input type="text" id="font-input" placeholder="Custom font URL...">
+
+        <br>
+        <div class="button-container">
+            <button id="submit-tooltip">Create</button>
+            <button id="deleteButton">Delete</button>
+        </div>
+    </div>
+
+    <!-- Camera panel -->
+    <div id="camera-panel" class="panel">
+        <h3>Camera Animation Options</h3>
+        <!-- Display frame count and duration -->
+        <div>
+            <p>Current Frame: <span id="currentFrame">0</span></p>
+            <p>Total Frames: <span id="frameCount">0</span></p>
+            <p>Duration: <span id="duration">0.00</span> seconds</p>
+
+        </div>
+
+        <label for="camera-speed">Camera Speed:</label>
+        <span id="camera-speed-value">10</span>
+        <input type="range" id="camera-speed" min="1" max="100" value="10">
+
+
+
+        <button id="startButton">Start Recording</button>
+        <button id="endButton">End Recording</button>
+        <button id="downloadButton">Download Camera Data</button>
+
+
+
+
+        <div id="testAnimation">
+            <h3>Test Camera Animation</h3>
+            <input type="file" id="fileInput" accept="application/json">
+        </div>
+    </div>
+
+    <!-- Scroll panel -->
+    <div id="scroll-panel" class="panel">
+        <h3>Scrollytelling Options</h3>
+        <label>Load generated JSON file: </label>
+        <input type="file" id="fileInput2" accept="application/json">
+        <br>
+
+
+
+        <!-- Display current frame, total frames, and duration -->
+        <div>
+            <p>Current Frame: <span id="currentFrame2">0</span></p>
+            <p>Total Frames: <span id="frameCount2">0</span></p>
+            <p>Duration: <span id="duration2">0.00</span> seconds</p>
+        </div>
+
+        <label for="speed-slider">Animation Speed:</label>
+        <span class="speed-value">1</span>
+        <input type="range" id="speed-slider" min="1" max="50" value="1">
+
+
+
+        <!-- Add "This Frame" slider -->
+        <label>Frames Slider:</label>
+        <span id="frame-slider-value">0</span>
+        <input type="range" id="frame-slider" min="0" max="0" value="0">
+
+        <h3>Sliding Text Options</h3>
+        <label>Direction of text:</label>
+        <select id="direction-select">
+            <option value="bottom-to-center">Bottom to Top</option>
+            <option value="left-to-center">Left to Right</option>
+            <option value="right-to-center">Right to Left</option>
+            <option value="top-to-center">Top to Bottom</option>
+        </select>
+        <div class="text-inputs-container">
+            <div class="text-input-row">
+                <label class="slideTitle">Slide 1:</label>
+                <input type="text" class="scrollableText" placeholder="Enter text...">
+                <input type="number" class="frameNumber" placeholder="Frame number for text appearance...">
+                <input type="number" class="durationFrames" placeholder="Duration in frames..." min="1">
+                <button class="delete-slide-button">Delete</button>
+            </div>
+        </div>
+        <button id="add-slide-button">Add Slide</button>
+    </div>
+
+    <div id="effects-panel" class="panel">
+        <h3>Post-Processing Effects</h3>
+        <label for="effect-select">Choose post-processing effect:</label>
+        <select id="effect-select">
+            <option value="none">None</option>
+            <option value="sketchy-pencil">Sketchy Pencil</option>
+            <option value="halftone">Halftone</option>
+            <option value="old-film">Old Film</option>
+            <option value="pixel">Pixel</option>
+            <option value="glitch">Glitch</option>
+            <option value="sobel">Sobel</option>
+            <option value="bloom">Bloom</option>
+            <option value="dot-screen">Dot Screen</option>
+            <option value="volumetric-light">Volumetric Light</option>
+            <option value="afterimage">Afterimage</option>
+            <option value="bad-tv">Bad TV</option>
+            <option value="custom-outline">Custom Outline</option>
+            <option value="moebius">Moebius</option>
+        </select>
+
+        <div id="effect-params"></div>
+
+        <h3>Gaussian Splat Effects</h3>
+        <!-- Dropdown for Color Effect -->
+        <label for="colorEffect">Color Effect:</label>
+        <select id="colorEffect">
+            <option value="0">Normal</option>
+            <option value="1">Grayscale</option>
+            <option value="2">Single Color + White</option>
+        </select>
+
+        <!-- Color Picker for Single Color -->
+        <label for="singleColor">Single Color:</label>
+        <input type="color" id="singleColor" value="#FF0000">
+
+        <!-- Range Input for Display Radius -->
+        <label for="displayRadius">Display Radius:</label>
+        <input type="range" id="displayRadius" min="0.1" max="10.0" step="0.1" value="1.0">
+        <span id="displayRadiusValue">1.0</span>
+    </div>
+
+    <!-- Scroll panel -->
+    <div id="export-panel" class="panel">
+        <h3>Export options</h3>
+
+
+    </div>
+
     <!-- A-Frame scene -->
     <a-scene xr-mode-ui="enabled: false" post-processing="effect: none">
         <!-- <a-box id="cutout-box" visible="false" scale="10 10 10" position="0.8145 1.73322 -2.35981"></a-box> -->
