@@ -14,5 +14,7 @@
 - Add improved code exporting feature.
 - Add multiple language support (preferably German, French and Spanish).
 - Talk to VisCom school, Ohio Today magazine and Barbara Geralds Institute for Storytelling and Social Impact to get their ideas and features they are interested in.  
-- Replace png icons with svg icons and add cdn url addresses so that scrolytelling exported remains standalone. 
+- Replace png icons with svg icons and add cdn url addresses so that scrolytelling exported remains standalone.
+- Add favicon/logo for the project. 
+
   
